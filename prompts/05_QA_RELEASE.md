@@ -1,0 +1,3 @@
+# PROMPT G7–G8 — BROWSER VALIDATION & RELEASE
+
+Read docs/12_QA_ACCEPTANCE.md, docs/16_DELIVERY_CHECKLIST.md and docs/17_FAILURE_MODES.md. Run TypeScript checks, lint, tests, production build, Playwright E2E, real browser smoke, screenshots desktop/mobile. Test every visible button and semantic part control. Capture 7s flight at keyframes including 3 gears and platform, 10 repeat cycles & return. Inspect browser console, context failures, animation drift. Profile performance high/low; verify reduced motion. Do not mark PASS unless proof. Write qa-report.md PASS/FAIL/BLOCKED per TC and asset-report.json. Produce proof files with real screenshots, no fabricated file links. Report any asset/quality limitation as NOT PRODUCTION READY.

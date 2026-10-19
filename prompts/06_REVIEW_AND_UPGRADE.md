@@ -1,0 +1,3 @@
+# PROMPT ITERATIVE REVIEW — POST IMPLEMENTATION
+
+Act as senior Awwwards art director and graphics engineer. Review browser screenshots + source. Score composition/model silhouette (25), materials/lighting (25), motion choreography (20), typography/UI (15), mobile (10), microinteraction/accessibility (5). Locate **top 5 actual** problems with evidence. Fix rather than merely suggest; prioritize cinematic model presentation, genuine machinery transition, no drifting on hover, tasteful shader styling. Re-run tests and make before/after screenshot comparison. Never solve low-quality aircraft asset with larger bloom; request asset upgrade if that is root cause.

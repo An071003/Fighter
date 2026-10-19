@@ -1,0 +1,1305 @@
+{
+  "schemaVersion": "1.0",
+  "model": "AERIS X-9 original fictional artwork, no weapons",
+  "axis": {
+    "up": "+Y",
+    "nose": "-Z",
+    "wings": "±X"
+  },
+  "minRequiredParts": 32,
+  "modelGlbUrl": "/assets/aircraft/aeris-x9.glb",
+  "notes": [
+    "nodeName is contractual, not proof corresponding meshes exist until validated against actual GLB",
+    "Offsets are visual design starting values; verify mesh collisions and adapt authoring"
+  ],
+  "parts": [
+    {
+      "id": "nose-shell",
+      "nodeName": "AX9__CORE__CENTER__NOSE_SHELL",
+      "label": {
+        "vi": "Vỏ mũi",
+        "en": "Nose Shell"
+      },
+      "category": "CORE",
+      "side": "CENTER",
+      "parentId": null,
+      "selectable": true,
+      "explode": {
+        "offset": [
+          0,
+          0,
+          -1.9
+        ],
+        "rotationDeg": [
+          0,
+          0,
+          0
+        ]
+      },
+      "focus": {
+        "preferredAzimuthDeg": 25,
+        "distanceMultiplier": 0.66
+      }
+    },
+    {
+      "id": "main-fuselage",
+      "nodeName": "AX9__CORE__CENTER__MAIN_FUSELAGE",
+      "label": {
+        "vi": "Thân chính",
+        "en": "Main Fuselage"
+      },
+      "category": "CORE",
+      "side": "CENTER",
+      "parentId": null,
+      "selectable": true,
+      "explode": {
+        "offset": [
+          0,
+          0.15,
+          0.1
+        ],
+        "rotationDeg": [
+          0,
+          0,
+          0
+        ]
+      },
+      "focus": {
+        "preferredAzimuthDeg": 25,
+        "distanceMultiplier": 0.66
+      }
+    },
+    {
+      "id": "upper-spine",
+      "nodeName": "AX9__CORE__CENTER__UPPER_SPINE",
+      "label": {
+        "vi": "Sống lưng thân",
+        "en": "Upper Spine"
+      },
+      "category": "CORE",
+      "side": "CENTER",
+      "parentId": null,
+      "selectable": true,
+      "explode": {
+        "offset": [
+          0,
+          1.1,
+          0
+        ],
+        "rotationDeg": [
+          0,
+          0,
+          0
+        ]
+      },
+      "focus": {
+        "preferredAzimuthDeg": 25,
+        "distanceMultiplier": 0.66
+      }
+    },
+    {
+      "id": "belly-shell",
+      "nodeName": "AX9__CORE__CENTER__BELLY_SHELL",
+      "label": {
+        "vi": "Tấm bụng",
+        "en": "Belly Shell"
+      },
+      "category": "CORE",
+      "side": "CENTER",
+      "parentId": null,
+      "selectable": true,
+      "explode": {
+        "offset": [
+          0,
+          -1.05,
+          0
+        ],
+        "rotationDeg": [
+          0,
+          0,
+          0
+        ]
+      },
+      "focus": {
+        "preferredAzimuthDeg": 25,
+        "distanceMultiplier": 0.66
+      }
+    },
+    {
+      "id": "rear-fuselage",
+      "nodeName": "AX9__CORE__CENTER__REAR_FUSELAGE",
+      "label": {
+        "vi": "Thân đuôi",
+        "en": "Rear Fuselage"
+      },
+      "category": "CORE",
+      "side": "CENTER",
+      "parentId": null,
+      "selectable": true,
+      "explode": {
+        "offset": [
+          0,
+          0.2,
+          2
+        ],
+        "rotationDeg": [
+          0,
+          0,
+          0
+        ]
+      },
+      "focus": {
+        "preferredAzimuthDeg": 25,
+        "distanceMultiplier": 0.66
+      }
+    },
+    {
+      "id": "canopy-glass",
+      "nodeName": "AX9__CANOPY__CENTER__CANOPY_GLASS",
+      "label": {
+        "vi": "Kính buồng lái",
+        "en": "Canopy Glass"
+      },
+      "category": "CANOPY",
+      "side": "CENTER",
+      "parentId": null,
+      "selectable": true,
+      "explode": {
+        "offset": [
+          0,
+          1.5,
+          -0.8
+        ],
+        "rotationDeg": [
+          0,
+          6,
+          0
+        ]
+      },
+      "focus": {
+        "preferredAzimuthDeg": 25,
+        "distanceMultiplier": 0.66
+      }
+    },
+    {
+      "id": "canopy-frame",
+      "nodeName": "AX9__CANOPY__CENTER__CANOPY_FRAME",
+      "label": {
+        "vi": "Khung kính",
+        "en": "Canopy Frame"
+      },
+      "category": "CANOPY",
+      "side": "CENTER",
+      "parentId": null,
+      "selectable": true,
+      "explode": {
+        "offset": [
+          0,
+          1.35,
+          -0.8
+        ],
+        "rotationDeg": [
+          0,
+          0,
+          0
+        ]
+      },
+      "focus": {
+        "preferredAzimuthDeg": 25,
+        "distanceMultiplier": 0.66
+      }
+    },
+    {
+      "id": "display-plate",
+      "nodeName": "AX9__CANOPY__CENTER__DISPLAY_PLATE",
+      "label": {
+        "vi": "Bảng hiển thị nghệ thuật",
+        "en": "Display Plate"
+      },
+      "category": "CANOPY",
+      "side": "CENTER",
+      "parentId": null,
+      "selectable": true,
+      "explode": {
+        "offset": [
+          0,
+          1.4,
+          -1.0
+        ],
+        "rotationDeg": [
+          0,
+          0,
+          0
+        ]
+      },
+      "focus": {
+        "preferredAzimuthDeg": 25,
+        "distanceMultiplier": 0.66
+      }
+    },
+    {
+      "id": "wing-left",
+      "nodeName": "AX9__SURFACE__LEFT__WING_LEFT",
+      "label": {
+        "vi": "Cánh trái",
+        "en": "Wing Left"
+      },
+      "category": "SURFACE",
+      "side": "LEFT",
+      "parentId": null,
+      "selectable": true,
+      "explode": {
+        "offset": [
+          -2.4,
+          0.65,
+          0
+        ],
+        "rotationDeg": [
+          0,
+          -8,
+          0
+        ]
+      },
+      "focus": {
+        "preferredAzimuthDeg": -45,
+        "distanceMultiplier": 0.66
+      }
+    },
+    {
+      "id": "elevon-left",
+      "nodeName": "AX9__SURFACE__LEFT__ELEVON_LEFT",
+      "label": {
+        "vi": "Cánh lái trái",
+        "en": "Elevon Left"
+      },
+      "category": "SURFACE",
+      "side": "LEFT",
+      "parentId": null,
+      "selectable": true,
+      "explode": {
+        "offset": [
+          -2.9,
+          0.25,
+          1.25
+        ],
+        "rotationDeg": [
+          0,
+          -8,
+          0
+        ]
+      },
+      "focus": {
+        "preferredAzimuthDeg": -45,
+        "distanceMultiplier": 0.66
+      }
+    },
+    {
+      "id": "stabilizer-left",
+      "nodeName": "AX9__SURFACE__LEFT__STABILIZER_LEFT",
+      "label": {
+        "vi": "Đuôi ngang trái",
+        "en": "Stabilizer Left"
+      },
+      "category": "SURFACE",
+      "side": "LEFT",
+      "parentId": null,
+      "selectable": true,
+      "explode": {
+        "offset": [
+          -2,
+          0.35,
+          2.5
+        ],
+        "rotationDeg": [
+          0,
+          0,
+          0
+        ]
+      },
+      "focus": {
+        "preferredAzimuthDeg": -45,
+        "distanceMultiplier": 0.66
+      }
+    },
+    {
+      "id": "fin-left",
+      "nodeName": "AX9__SURFACE__LEFT__FIN_LEFT",
+      "label": {
+        "vi": "Cánh đuôi đứng trái",
+        "en": "Fin Left"
+      },
+      "category": "SURFACE",
+      "side": "LEFT",
+      "parentId": null,
+      "selectable": true,
+      "explode": {
+        "offset": [
+          -0.85,
+          1.35,
+          2.4
+        ],
+        "rotationDeg": [
+          0,
+          0,
+          0
+        ]
+      },
+      "focus": {
+        "preferredAzimuthDeg": -45,
+        "distanceMultiplier": 0.66
+      }
+    },
+    {
+      "id": "intake-shell-left",
+      "nodeName": "AX9__DUCT__LEFT__INTAKE_SHELL_LEFT",
+      "label": {
+        "vi": "Vỏ cửa hút khí trái",
+        "en": "Intake Shell Left"
+      },
+      "category": "DUCT",
+      "side": "LEFT",
+      "parentId": null,
+      "selectable": true,
+      "explode": {
+        "offset": [
+          -1.4,
+          0.8,
+          0.2
+        ],
+        "rotationDeg": [
+          0,
+          0,
+          0
+        ]
+      },
+      "focus": {
+        "preferredAzimuthDeg": -45,
+        "distanceMultiplier": 0.66
+      }
+    },
+    {
+      "id": "rear-shroud-left",
+      "nodeName": "AX9__DUCT__LEFT__REAR_SHROUD_LEFT",
+      "label": {
+        "vi": "Vỏ ống xả trái",
+        "en": "Rear Shroud Left"
+      },
+      "category": "DUCT",
+      "side": "LEFT",
+      "parentId": null,
+      "selectable": true,
+      "explode": {
+        "offset": [
+          -1.2,
+          0.4,
+          2.5
+        ],
+        "rotationDeg": [
+          0,
+          0,
+          0
+        ]
+      },
+      "focus": {
+        "preferredAzimuthDeg": -45,
+        "distanceMultiplier": 0.66
+      }
+    },
+    {
+      "id": "exhaust-ring-left",
+      "nodeName": "AX9__DUCT__LEFT__EXHAUST_RING_LEFT",
+      "label": {
+        "vi": "Vành xả trái",
+        "en": "Exhaust Ring Left"
+      },
+      "category": "DUCT",
+      "side": "LEFT",
+      "parentId": null,
+      "selectable": true,
+      "explode": {
+        "offset": [
+          -1.8,
+          0.2,
+          3.3
+        ],
+        "rotationDeg": [
+          0,
+          0,
+          0
+        ]
+      },
+      "focus": {
+        "preferredAzimuthDeg": -45,
+        "distanceMultiplier": 0.66
+      }
+    },
+    {
+      "id": "leading-trim-left",
+      "nodeName": "AX9__SURFACE__LEFT__LEADING_TRIM_LEFT",
+      "label": {
+        "vi": "Nẹp cạnh cánh trái",
+        "en": "Leading Trim Left"
+      },
+      "category": "SURFACE",
+      "side": "LEFT",
+      "parentId": null,
+      "selectable": true,
+      "explode": {
+        "offset": [
+          -2.2,
+          0.65,
+          -0.6
+        ],
+        "rotationDeg": [
+          0,
+          0,
+          0
+        ]
+      },
+      "focus": {
+        "preferredAzimuthDeg": -45,
+        "distanceMultiplier": 0.66
+      }
+    },
+    {
+      "id": "tip-light-left",
+      "nodeName": "AX9__LIGHT__LEFT__TIP_LIGHT_LEFT",
+      "label": {
+        "vi": "Đèn mép cánh trái",
+        "en": "Tip Light Left"
+      },
+      "category": "LIGHT",
+      "side": "LEFT",
+      "parentId": null,
+      "selectable": true,
+      "explode": {
+        "offset": [
+          -2.6,
+          0.85,
+          -0.3
+        ],
+        "rotationDeg": [
+          0,
+          0,
+          0
+        ]
+      },
+      "focus": {
+        "preferredAzimuthDeg": -45,
+        "distanceMultiplier": 0.66
+      }
+    },
+    {
+      "id": "wing-right",
+      "nodeName": "AX9__SURFACE__RIGHT__WING_RIGHT",
+      "label": {
+        "vi": "Cánh phải",
+        "en": "Wing Right"
+      },
+      "category": "SURFACE",
+      "side": "RIGHT",
+      "parentId": null,
+      "selectable": true,
+      "explode": {
+        "offset": [
+          2.4,
+          0.65,
+          0
+        ],
+        "rotationDeg": [
+          0,
+          8,
+          0
+        ]
+      },
+      "focus": {
+        "preferredAzimuthDeg": 45,
+        "distanceMultiplier": 0.66
+      }
+    },
+    {
+      "id": "elevon-right",
+      "nodeName": "AX9__SURFACE__RIGHT__ELEVON_RIGHT",
+      "label": {
+        "vi": "Cánh lái phải",
+        "en": "Elevon Right"
+      },
+      "category": "SURFACE",
+      "side": "RIGHT",
+      "parentId": null,
+      "selectable": true,
+      "explode": {
+        "offset": [
+          2.9,
+          0.25,
+          1.25
+        ],
+        "rotationDeg": [
+          0,
+          8,
+          0
+        ]
+      },
+      "focus": {
+        "preferredAzimuthDeg": 45,
+        "distanceMultiplier": 0.66
+      }
+    },
+    {
+      "id": "stabilizer-right",
+      "nodeName": "AX9__SURFACE__RIGHT__STABILIZER_RIGHT",
+      "label": {
+        "vi": "Đuôi ngang phải",
+        "en": "Stabilizer Right"
+      },
+      "category": "SURFACE",
+      "side": "RIGHT",
+      "parentId": null,
+      "selectable": true,
+      "explode": {
+        "offset": [
+          2,
+          0.35,
+          2.5
+        ],
+        "rotationDeg": [
+          0,
+          0,
+          0
+        ]
+      },
+      "focus": {
+        "preferredAzimuthDeg": 45,
+        "distanceMultiplier": 0.66
+      }
+    },
+    {
+      "id": "fin-right",
+      "nodeName": "AX9__SURFACE__RIGHT__FIN_RIGHT",
+      "label": {
+        "vi": "Cánh đuôi đứng phải",
+        "en": "Fin Right"
+      },
+      "category": "SURFACE",
+      "side": "RIGHT",
+      "parentId": null,
+      "selectable": true,
+      "explode": {
+        "offset": [
+          0.85,
+          1.35,
+          2.4
+        ],
+        "rotationDeg": [
+          0,
+          0,
+          0
+        ]
+      },
+      "focus": {
+        "preferredAzimuthDeg": 45,
+        "distanceMultiplier": 0.66
+      }
+    },
+    {
+      "id": "intake-shell-right",
+      "nodeName": "AX9__DUCT__RIGHT__INTAKE_SHELL_RIGHT",
+      "label": {
+        "vi": "Vỏ cửa hút khí phải",
+        "en": "Intake Shell Right"
+      },
+      "category": "DUCT",
+      "side": "RIGHT",
+      "parentId": null,
+      "selectable": true,
+      "explode": {
+        "offset": [
+          1.4,
+          0.8,
+          0.2
+        ],
+        "rotationDeg": [
+          0,
+          0,
+          0
+        ]
+      },
+      "focus": {
+        "preferredAzimuthDeg": 45,
+        "distanceMultiplier": 0.66
+      }
+    },
+    {
+      "id": "rear-shroud-right",
+      "nodeName": "AX9__DUCT__RIGHT__REAR_SHROUD_RIGHT",
+      "label": {
+        "vi": "Vỏ ống xả phải",
+        "en": "Rear Shroud Right"
+      },
+      "category": "DUCT",
+      "side": "RIGHT",
+      "parentId": null,
+      "selectable": true,
+      "explode": {
+        "offset": [
+          1.2,
+          0.4,
+          2.5
+        ],
+        "rotationDeg": [
+          0,
+          0,
+          0
+        ]
+      },
+      "focus": {
+        "preferredAzimuthDeg": 45,
+        "distanceMultiplier": 0.66
+      }
+    },
+    {
+      "id": "exhaust-ring-right",
+      "nodeName": "AX9__DUCT__RIGHT__EXHAUST_RING_RIGHT",
+      "label": {
+        "vi": "Vành xả phải",
+        "en": "Exhaust Ring Right"
+      },
+      "category": "DUCT",
+      "side": "RIGHT",
+      "parentId": null,
+      "selectable": true,
+      "explode": {
+        "offset": [
+          1.8,
+          0.2,
+          3.3
+        ],
+        "rotationDeg": [
+          0,
+          0,
+          0
+        ]
+      },
+      "focus": {
+        "preferredAzimuthDeg": 45,
+        "distanceMultiplier": 0.66
+      }
+    },
+    {
+      "id": "leading-trim-right",
+      "nodeName": "AX9__SURFACE__RIGHT__LEADING_TRIM_RIGHT",
+      "label": {
+        "vi": "Nẹp cạnh cánh phải",
+        "en": "Leading Trim Right"
+      },
+      "category": "SURFACE",
+      "side": "RIGHT",
+      "parentId": null,
+      "selectable": true,
+      "explode": {
+        "offset": [
+          2.2,
+          0.65,
+          -0.6
+        ],
+        "rotationDeg": [
+          0,
+          0,
+          0
+        ]
+      },
+      "focus": {
+        "preferredAzimuthDeg": 45,
+        "distanceMultiplier": 0.66
+      }
+    },
+    {
+      "id": "tip-light-right",
+      "nodeName": "AX9__LIGHT__RIGHT__TIP_LIGHT_RIGHT",
+      "label": {
+        "vi": "Đèn mép cánh phải",
+        "en": "Tip Light Right"
+      },
+      "category": "LIGHT",
+      "side": "RIGHT",
+      "parentId": null,
+      "selectable": true,
+      "explode": {
+        "offset": [
+          2.6,
+          0.85,
+          -0.3
+        ],
+        "rotationDeg": [
+          0,
+          0,
+          0
+        ]
+      },
+      "focus": {
+        "preferredAzimuthDeg": 45,
+        "distanceMultiplier": 0.66
+      }
+    },
+    {
+      "id": "gear-strut-front",
+      "nodeName": "AX9__GEAR__FRONT__GEAR_STRUT_FRONT",
+      "label": {
+        "vi": "Càng đáp trước",
+        "en": "Gear Strut Front"
+      },
+      "category": "GEAR",
+      "side": "FRONT",
+      "parentId": null,
+      "selectable": true,
+      "explode": {
+        "offset": [
+          0.0,
+          -1.9,
+          -0.6
+        ],
+        "rotationDeg": [
+          0,
+          0,
+          0
+        ]
+      },
+      "focus": {
+        "preferredAzimuthDeg": 25,
+        "distanceMultiplier": 0.66
+      }
+    },
+    {
+      "id": "gear-wheel-front",
+      "nodeName": "AX9__GEAR__FRONT__GEAR_WHEEL_FRONT",
+      "label": {
+        "vi": "Lốp bánh trước",
+        "en": "Gear Wheel Front"
+      },
+      "category": "GEAR",
+      "side": "FRONT",
+      "parentId": "gear-strut-front",
+      "selectable": true,
+      "explode": {
+        "offset": [
+          0.0,
+          -2.4,
+          -0.6
+        ],
+        "rotationDeg": [
+          0,
+          0,
+          0
+        ]
+      },
+      "focus": {
+        "preferredAzimuthDeg": 25,
+        "distanceMultiplier": 0.66
+      }
+    },
+    {
+      "id": "gear-hub-front",
+      "nodeName": "AX9__GEAR__FRONT__GEAR_HUB_FRONT",
+      "label": {
+        "vi": "Vành bánh trước",
+        "en": "Gear Hub Front"
+      },
+      "category": "GEAR",
+      "side": "FRONT",
+      "parentId": "gear-wheel-front",
+      "selectable": true,
+      "explode": {
+        "offset": [
+          0,
+          -2.4,
+          -0.6
+        ],
+        "rotationDeg": [
+          0,
+          0,
+          0
+        ]
+      },
+      "focus": {
+        "preferredAzimuthDeg": 25,
+        "distanceMultiplier": 0.66
+      }
+    },
+    {
+      "id": "gear-door-front",
+      "nodeName": "AX9__GEAR__FRONT__GEAR_DOOR_FRONT",
+      "label": {
+        "vi": "Nắp khoang bánh trước",
+        "en": "Gear Door Front"
+      },
+      "category": "GEAR",
+      "side": "FRONT",
+      "parentId": null,
+      "selectable": true,
+      "explode": {
+        "offset": [
+          0.0,
+          -1.25,
+          -0.6
+        ],
+        "rotationDeg": [
+          0,
+          0,
+          0
+        ]
+      },
+      "focus": {
+        "preferredAzimuthDeg": 25,
+        "distanceMultiplier": 0.66
+      }
+    },
+    {
+      "id": "gear-strut-left",
+      "nodeName": "AX9__GEAR__LEFT__GEAR_STRUT_LEFT",
+      "label": {
+        "vi": "Càng đáp trái",
+        "en": "Gear Strut Left"
+      },
+      "category": "GEAR",
+      "side": "LEFT",
+      "parentId": null,
+      "selectable": true,
+      "explode": {
+        "offset": [
+          -0.75,
+          -1.9,
+          0.6
+        ],
+        "rotationDeg": [
+          0,
+          0,
+          0
+        ]
+      },
+      "focus": {
+        "preferredAzimuthDeg": -45,
+        "distanceMultiplier": 0.66
+      }
+    },
+    {
+      "id": "gear-wheel-left",
+      "nodeName": "AX9__GEAR__LEFT__GEAR_WHEEL_LEFT",
+      "label": {
+        "vi": "Lốp bánh trái",
+        "en": "Gear Wheel Left"
+      },
+      "category": "GEAR",
+      "side": "LEFT",
+      "parentId": "gear-strut-left",
+      "selectable": true,
+      "explode": {
+        "offset": [
+          -0.95,
+          -2.4,
+          0.6
+        ],
+        "rotationDeg": [
+          0,
+          0,
+          0
+        ]
+      },
+      "focus": {
+        "preferredAzimuthDeg": -45,
+        "distanceMultiplier": 0.66
+      }
+    },
+    {
+      "id": "gear-hub-left",
+      "nodeName": "AX9__GEAR__LEFT__GEAR_HUB_LEFT",
+      "label": {
+        "vi": "Vành bánh trái",
+        "en": "Gear Hub Left"
+      },
+      "category": "GEAR",
+      "side": "LEFT",
+      "parentId": "gear-wheel-left",
+      "selectable": true,
+      "explode": {
+        "offset": [
+          -1,
+          -2.4,
+          0.6
+        ],
+        "rotationDeg": [
+          0,
+          0,
+          0
+        ]
+      },
+      "focus": {
+        "preferredAzimuthDeg": -45,
+        "distanceMultiplier": 0.66
+      }
+    },
+    {
+      "id": "gear-door-left",
+      "nodeName": "AX9__GEAR__LEFT__GEAR_DOOR_LEFT",
+      "label": {
+        "vi": "Nắp khoang bánh trái",
+        "en": "Gear Door Left"
+      },
+      "category": "GEAR",
+      "side": "LEFT",
+      "parentId": null,
+      "selectable": true,
+      "explode": {
+        "offset": [
+          -1.15,
+          -1.25,
+          0.5
+        ],
+        "rotationDeg": [
+          0,
+          0,
+          0
+        ]
+      },
+      "focus": {
+        "preferredAzimuthDeg": -45,
+        "distanceMultiplier": 0.66
+      }
+    },
+    {
+      "id": "gear-strut-right",
+      "nodeName": "AX9__GEAR__RIGHT__GEAR_STRUT_RIGHT",
+      "label": {
+        "vi": "Càng đáp phải",
+        "en": "Gear Strut Right"
+      },
+      "category": "GEAR",
+      "side": "RIGHT",
+      "parentId": null,
+      "selectable": true,
+      "explode": {
+        "offset": [
+          0.75,
+          -1.9,
+          0.6
+        ],
+        "rotationDeg": [
+          0,
+          0,
+          0
+        ]
+      },
+      "focus": {
+        "preferredAzimuthDeg": 45,
+        "distanceMultiplier": 0.66
+      }
+    },
+    {
+      "id": "gear-wheel-right",
+      "nodeName": "AX9__GEAR__RIGHT__GEAR_WHEEL_RIGHT",
+      "label": {
+        "vi": "Lốp bánh phải",
+        "en": "Gear Wheel Right"
+      },
+      "category": "GEAR",
+      "side": "RIGHT",
+      "parentId": "gear-strut-right",
+      "selectable": true,
+      "explode": {
+        "offset": [
+          0.95,
+          -2.4,
+          0.6
+        ],
+        "rotationDeg": [
+          0,
+          0,
+          0
+        ]
+      },
+      "focus": {
+        "preferredAzimuthDeg": 45,
+        "distanceMultiplier": 0.66
+      }
+    },
+    {
+      "id": "gear-hub-right",
+      "nodeName": "AX9__GEAR__RIGHT__GEAR_HUB_RIGHT",
+      "label": {
+        "vi": "Vành bánh phải",
+        "en": "Gear Hub Right"
+      },
+      "category": "GEAR",
+      "side": "RIGHT",
+      "parentId": "gear-wheel-right",
+      "selectable": true,
+      "explode": {
+        "offset": [
+          1,
+          -2.4,
+          0.6
+        ],
+        "rotationDeg": [
+          0,
+          0,
+          0
+        ]
+      },
+      "focus": {
+        "preferredAzimuthDeg": 45,
+        "distanceMultiplier": 0.66
+      }
+    },
+    {
+      "id": "gear-door-right",
+      "nodeName": "AX9__GEAR__RIGHT__GEAR_DOOR_RIGHT",
+      "label": {
+        "vi": "Nắp khoang bánh phải",
+        "en": "Gear Door Right"
+      },
+      "category": "GEAR",
+      "side": "RIGHT",
+      "parentId": null,
+      "selectable": true,
+      "explode": {
+        "offset": [
+          1.15,
+          -1.25,
+          0.5
+        ],
+        "rotationDeg": [
+          0,
+          0,
+          0
+        ]
+      },
+      "focus": {
+        "preferredAzimuthDeg": 45,
+        "distanceMultiplier": 0.66
+      }
+    },
+    {
+      "id": "panel-left-1",
+      "nodeName": "AX9__PANEL__LEFT__PANEL_LEFT_1",
+      "label": {
+        "vi": "Tấm bảo trì 1 trái",
+        "en": "Panel Left 1"
+      },
+      "category": "PANEL",
+      "side": "LEFT",
+      "parentId": null,
+      "selectable": true,
+      "explode": {
+        "offset": [
+          -0.86,
+          0.77,
+          -0.4
+        ],
+        "rotationDeg": [
+          0,
+          -3,
+          0
+        ]
+      },
+      "focus": {
+        "preferredAzimuthDeg": -45,
+        "distanceMultiplier": 0.66
+      }
+    },
+    {
+      "id": "panel-left-2",
+      "nodeName": "AX9__PANEL__LEFT__PANEL_LEFT_2",
+      "label": {
+        "vi": "Tấm bảo trì 2 trái",
+        "en": "Panel Left 2"
+      },
+      "category": "PANEL",
+      "side": "LEFT",
+      "parentId": null,
+      "selectable": true,
+      "explode": {
+        "offset": [
+          -1.02,
+          0.89,
+          0.09999999999999998
+        ],
+        "rotationDeg": [
+          0,
+          -3,
+          0
+        ]
+      },
+      "focus": {
+        "preferredAzimuthDeg": -45,
+        "distanceMultiplier": 0.66
+      }
+    },
+    {
+      "id": "panel-left-3",
+      "nodeName": "AX9__PANEL__LEFT__PANEL_LEFT_3",
+      "label": {
+        "vi": "Tấm bảo trì 3 trái",
+        "en": "Panel Left 3"
+      },
+      "category": "PANEL",
+      "side": "LEFT",
+      "parentId": null,
+      "selectable": true,
+      "explode": {
+        "offset": [
+          -1.18,
+          1.01,
+          0.6
+        ],
+        "rotationDeg": [
+          0,
+          -3,
+          0
+        ]
+      },
+      "focus": {
+        "preferredAzimuthDeg": -45,
+        "distanceMultiplier": 0.66
+      }
+    },
+    {
+      "id": "panel-left-4",
+      "nodeName": "AX9__PANEL__LEFT__PANEL_LEFT_4",
+      "label": {
+        "vi": "Tấm bảo trì 4 trái",
+        "en": "Panel Left 4"
+      },
+      "category": "PANEL",
+      "side": "LEFT",
+      "parentId": null,
+      "selectable": true,
+      "explode": {
+        "offset": [
+          -1.3399999999999999,
+          1.13,
+          1.1
+        ],
+        "rotationDeg": [
+          0,
+          -3,
+          0
+        ]
+      },
+      "focus": {
+        "preferredAzimuthDeg": -45,
+        "distanceMultiplier": 0.66
+      }
+    },
+    {
+      "id": "panel-right-1",
+      "nodeName": "AX9__PANEL__RIGHT__PANEL_RIGHT_1",
+      "label": {
+        "vi": "Tấm bảo trì 1 phải",
+        "en": "Panel Right 1"
+      },
+      "category": "PANEL",
+      "side": "RIGHT",
+      "parentId": null,
+      "selectable": true,
+      "explode": {
+        "offset": [
+          0.86,
+          0.77,
+          -0.4
+        ],
+        "rotationDeg": [
+          0,
+          3,
+          0
+        ]
+      },
+      "focus": {
+        "preferredAzimuthDeg": 45,
+        "distanceMultiplier": 0.66
+      }
+    },
+    {
+      "id": "panel-right-2",
+      "nodeName": "AX9__PANEL__RIGHT__PANEL_RIGHT_2",
+      "label": {
+        "vi": "Tấm bảo trì 2 phải",
+        "en": "Panel Right 2"
+      },
+      "category": "PANEL",
+      "side": "RIGHT",
+      "parentId": null,
+      "selectable": true,
+      "explode": {
+        "offset": [
+          1.02,
+          0.89,
+          0.09999999999999998
+        ],
+        "rotationDeg": [
+          0,
+          3,
+          0
+        ]
+      },
+      "focus": {
+        "preferredAzimuthDeg": 45,
+        "distanceMultiplier": 0.66
+      }
+    },
+    {
+      "id": "panel-right-3",
+      "nodeName": "AX9__PANEL__RIGHT__PANEL_RIGHT_3",
+      "label": {
+        "vi": "Tấm bảo trì 3 phải",
+        "en": "Panel Right 3"
+      },
+      "category": "PANEL",
+      "side": "RIGHT",
+      "parentId": null,
+      "selectable": true,
+      "explode": {
+        "offset": [
+          1.18,
+          1.01,
+          0.6
+        ],
+        "rotationDeg": [
+          0,
+          3,
+          0
+        ]
+      },
+      "focus": {
+        "preferredAzimuthDeg": 45,
+        "distanceMultiplier": 0.66
+      }
+    },
+    {
+      "id": "panel-right-4",
+      "nodeName": "AX9__PANEL__RIGHT__PANEL_RIGHT_4",
+      "label": {
+        "vi": "Tấm bảo trì 4 phải",
+        "en": "Panel Right 4"
+      },
+      "category": "PANEL",
+      "side": "RIGHT",
+      "parentId": null,
+      "selectable": true,
+      "explode": {
+        "offset": [
+          1.3399999999999999,
+          1.13,
+          1.1
+        ],
+        "rotationDeg": [
+          0,
+          3,
+          0
+        ]
+      },
+      "focus": {
+        "preferredAzimuthDeg": 45,
+        "distanceMultiplier": 0.66
+      }
+    }
+  ]
+}
