@@ -26,24 +26,25 @@ export const TopBar: React.FC = () => {
       {/* Top Global Utility Header */}
       <header className="fixed top-0 inset-x-0 z-20 px-3 sm:px-6 py-2.5 flex items-center justify-between pointer-events-none">
         {/* Brand + Mode Index */}
-        <div className="pointer-events-auto flex items-center gap-3 bg-[#0E141D]/85 backdrop-blur-xl border border-[#2D3B49] rounded-2xl px-3.5 py-2 shadow-lg">
+        <div className="pointer-events-auto flex items-center gap-2 sm:gap-3 bg-[#0E141D]/85 backdrop-blur-xl border border-[#2D3B49] rounded-2xl px-3 sm:px-3.5 py-2 shadow-lg whitespace-nowrap">
           <div className="flex items-center gap-2">
-            <span className="w-2.5 h-2.5 rounded-full bg-[#67E5DF] shadow-[0_0_10px_#67E5DF]" />
-            <span className="font-mono text-xs font-bold tracking-widest uppercase text-[#E9F0F5]">
+            <span className="w-2 h-2 sm:w-2.5 sm:h-2.5 rounded-full bg-[#67E5DF] shadow-[0_0_10px_#67E5DF]" />
+            <span className="font-mono text-[11px] sm:text-xs font-bold tracking-widest uppercase text-[#E9F0F5]">
               AERIS X-9
             </span>
           </div>
-          <span className="text-[#2D3B49]">|</span>
+          <span className="hidden sm:inline text-[#2D3B49]">|</span>
           <div
             data-testid="active-mode-badge"
-            className="font-mono text-[11px] uppercase tracking-wider text-[#67E5DF]"
+            className="hidden sm:block font-mono text-[11px] uppercase tracking-wider text-[#67E5DF] whitespace-nowrap"
           >
-            {modeBadge.code} · <span className="text-[#E9F0F5]">{modeBadge.labelVi}</span>
+            <span>{modeBadge.code}</span>
+            <span className="text-[#E9F0F5]"> · {modeBadge.labelVi}</span>
           </div>
         </div>
 
         {/* Utility Actions (Parts Explorer, Quality, Help, Reset Scene) */}
-        <div className="pointer-events-auto flex items-center gap-2">
+        <div className="pointer-events-auto flex items-center gap-1.5 sm:gap-2">
           <button
             type="button"
             data-testid="parts-drawer-toggle"
@@ -108,8 +109,8 @@ export const TopBar: React.FC = () => {
           )}
         </div>
 
-        <h1 className="font-display-hero text-[#E9F0F5] tracking-tight mb-2 drop-shadow-[0_6px_28px_rgba(0,0,0,0.85)]">
-          AERIS X—9
+        <h1 className="font-display-hero text-[#E9F0F5] tracking-tight mb-2 whitespace-nowrap drop-shadow-[0_6px_28px_rgba(0,0,0,0.85)]">
+          AERIS X-9
         </h1>
 
         <p className="hidden sm:block font-body text-xs sm:text-sm text-[#95A5B3] max-w-[36ch] mb-4 drop-shadow">

@@ -78,6 +78,9 @@ export const FlightDirector: React.FC = () => {
       );
       currentFlightFrameRef.current = frame;
       visualClockRef.turntableAngleRad = 0;
+      if (state.flightPhaseLabel !== frame.phaseLabel) {
+        state.syncTimelineUi(FLIGHT_DURATION_SECONDS, 0, frame.phaseLabel);
+      }
     } else if (state.mode === 'return-transition') {
       if (!state.flightPaused) {
         visualClockRef.returnProgress01 = Math.min(

@@ -8,8 +8,6 @@ import { getPartById } from '@/domain/partRegistry';
 import { useAppStore } from '@/domain/store';
 import { useAircraftRig } from '../aircraft/AircraftRig';
 
-const DEG2RAD = Math.PI / 180;
-
 export const CameraRig: React.FC = () => {
   const controlsRef = useRef<OrbitControlsImpl | null>(null);
   const { camera, size } = useThree();
@@ -37,8 +35,8 @@ export const CameraRig: React.FC = () => {
   useEffect(() => {
     const presetCfg = CAMERA_PRESETS[cameraPreset] ?? CAMERA_PRESETS.hero;
     const isMobile = size.width < 768;
-    const mobileScale = isMobile ? 1.28 : 1.0;
-    const explodeScale = 1.0 + explodeProgress * 0.25;
+    const mobileScale = isMobile ? 1.32 : 1.0;
+    const explodeScale = 1.0 + explodeProgress * 0.42;
 
     if (selectedPartId && (mode === 'inspect' || mode === 'exploded')) {
       const part = getPartById(selectedPartId);
@@ -47,15 +45,20 @@ export const CameraRig: React.FC = () => {
         worldBoxRef.setFromObject(node);
         worldBoxRef.getCenter(boxCenterRef);
 
-        const azRad = (part.focus.preferredAzimuthDeg || 25) * DEG2RAD;
-        const dist = 6.2 * (part.focus.distanceMultiplier || 0.7) * mobileScale;
-        const elevY = part.category === 'GEAR' ? -0.35 : 1.45;
+        const dist = Math.max(5.8, 7.6 * (part.focus.distanceMultiplier || 0.78)) * mobileScale;
+        const elevY = part.category === 'GEAR' ? 0.45 : 2.15;
+        const sideSign = boxCenterRef.x < -0.25 ? -1 : 1;
 
-        desiredTargetRef.current.copy(boxCenterRef);
+        // Offset target slightly so the part sits in the open viewport between left hero text and right inspector drawer
+        desiredTargetRef.current.set(
+          boxCenterRef.x + sideSign * 0.35,
+          boxCenterRef.y,
+          boxCenterRef.z
+        );
         desiredPosRef.current.set(
-          boxCenterRef.x + Math.sin(azRad) * dist,
+          boxCenterRef.x + sideSign * dist * 0.78,
           boxCenterRef.y + elevY,
-          boxCenterRef.z - Math.cos(azRad) * dist
+          boxCenterRef.z - dist * 0.82
         );
         isTransitionActiveRef.current = true;
         return;

@@ -25,7 +25,7 @@ export const PartDetails: React.FC = () => {
           transition={{ duration: 0.24 }}
           aria-label="Bảng thông tin và danh mục bộ phận 3D"
           data-testid="part-details-drawer"
-          className="fixed z-30 right-3 md:right-6 top-16 md:top-20 bottom-28 md:bottom-28 w-[calc(100vw-1.5rem)] sm:w-[360px] max-h-[54vh] md:max-h-none rounded-2xl bg-[#0E141D]/92 backdrop-blur-2xl border border-[#2D3B49] shadow-[0_24px_80px_rgba(0,0,0,0.65)] flex flex-col overflow-hidden pointer-events-auto"
+          className="fixed z-30 right-3 md:right-6 top-16 md:top-16 bottom-44 md:bottom-36 w-[calc(100vw-1.5rem)] sm:w-[360px] max-h-[54vh] md:max-h-none rounded-2xl bg-[#0E141D]/92 backdrop-blur-2xl border border-[#2D3B49] shadow-[0_24px_80px_rgba(0,0,0,0.65)] flex flex-col overflow-hidden pointer-events-auto"
         >
           {/* Drawer Header */}
           <div className="px-4 py-3 border-b border-[#2D3B49] flex items-center justify-between bg-[#070A0F]/60">

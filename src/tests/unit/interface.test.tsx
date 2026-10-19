@@ -36,7 +36,7 @@ describe('AERIS X-9 Editorial Interface & Accessibility (G6 / Group D)', () => {
       </>
     );
 
-    expect(screen.getByText('AERIS X—9')).toBeInTheDocument();
+    expect(screen.getByRole('heading', { name: 'AERIS X-9' })).toBeInTheDocument();
 
     const explodeBtn = screen.getByTestId('explode-toggle');
     fireEvent.click(explodeBtn);

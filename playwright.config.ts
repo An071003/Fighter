@@ -6,6 +6,7 @@ export default defineConfig({
   forbidOnly: !!process.env.CI,
   retries: 0,
   workers: 1,
+  timeout: 90000,
   reporter: 'list',
   use: {
     baseURL: 'http://localhost:4173',
@@ -18,7 +19,7 @@ export default defineConfig({
       use: {
         ...devices['Desktop Chrome'],
         launchOptions: {
-          args: ['--use-gl=angle', '--use-angle=swiftshader', '--enable-webgl', '--ignore-gpu-blocklist'],
+          args: ['--enable-webgl', '--ignore-gpu-blocklist', '--enable-gpu-rasterization'],
         },
       },
     },

@@ -28,6 +28,13 @@ export const GearRig: React.FC = () => {
       state.mode === 'return-transition';
 
     if (!isFlightActive) {
+      const nodes = partNodesMapRef.current;
+      for (const sId of ['gear-strut-front', 'gear-strut-left', 'gear-strut-right']) {
+        const sObj = nodes.get(sId);
+        if (sObj && sObj.scale.x !== 1) {
+          sObj.scale.setScalar(1);
+        }
+      }
       return;
     }
 
@@ -65,13 +72,16 @@ export const GearRig: React.FC = () => {
       rzDeg: number;
       retractLiftY: number;
     }> = [
-      // Front nose gear swings forward/upward along X into nose bay
-      { id: 'gear-strut-front', rxDeg: 86, ryDeg: 0, rzDeg: 0, retractLiftY: 0.12 },
-      // Left main gear swings inward (+Z) and slightly aft (+X) into left belly bay
-      { id: 'gear-strut-left', rxDeg: 14, ryDeg: 0, rzDeg: 84, retractLiftY: 0.14 },
-      // Right main gear swings inward (-Z) and slightly aft (+X) into right belly bay
-      { id: 'gear-strut-right', rxDeg: 14, ryDeg: 0, rzDeg: -84, retractLiftY: 0.14 },
+      // Front nose gear swings aft/upward along X into forward fuselage bay
+      { id: 'gear-strut-front', rxDeg: 88, ryDeg: 0, rzDeg: 0, retractLiftY: 0.22 },
+      // Left main gear swings inward (+Z) and upward into left belly bay
+      { id: 'gear-strut-left', rxDeg: 14, ryDeg: 0, rzDeg: 86, retractLiftY: 0.24 },
+      // Right main gear swings inward (-Z) and upward into right belly bay
+      { id: 'gear-strut-right', rxDeg: 14, ryDeg: 0, rzDeg: -86, retractLiftY: 0.24 },
     ];
+
+    const bayTuckScale =
+      1 - Math.max(0, Math.min(1, (frame.gearRetracted - 0.72) / 0.28)) * 0.48;
 
     for (const cfg of strutConfigs) {
       const strutObj = nodes.get(cfg.id);
@@ -96,6 +106,7 @@ export const GearRig: React.FC = () => {
         rest.position[2]
       );
       strutObj.quaternion.copy(scratch.restQuat).multiply(scratch.deltaQuat);
+      strutObj.scale.setScalar(bayTuckScale);
     }
 
     // 3. Wheels (children of struts; spin around local X axle)

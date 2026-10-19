@@ -40,24 +40,31 @@ export const BottomTransport: React.FC = () => {
   return (
     <footer
       aria-label="Bảng điều khiển trình diễn và timeline 3D"
-      className="fixed bottom-0 inset-x-0 z-20 p-2.5 sm:p-5 pointer-events-none"
+      className="fixed bottom-0 inset-x-0 z-20 p-2.5 sm:p-4 pointer-events-none"
     >
-      <div className="max-w-[1380px] mx-auto pointer-events-auto rounded-2xl bg-[#0E141D]/90 backdrop-blur-2xl border border-[#2D3B49] px-3.5 py-3 shadow-[0_20px_60px_rgba(0,0,0,0.7)] flex flex-col lg:flex-row items-stretch lg:items-center justify-between gap-3">
+      {/* Floating Camera Presets Bar on Desktop */}
+      <div className="hidden xl:flex justify-center mb-2">
+        <div className="pointer-events-auto rounded-2xl bg-[#0E141D]/85 backdrop-blur-xl border border-[#2D3B49] px-3 py-1.5 shadow-lg">
+          <CameraPresets />
+        </div>
+      </div>
+
+      <div className="max-w-[1380px] mx-auto pointer-events-auto rounded-2xl bg-[#0E141D]/92 backdrop-blur-2xl border border-[#2D3B49] px-3.5 py-2.5 shadow-[0_20px_60px_rgba(0,0,0,0.7)] flex flex-col lg:flex-row items-stretch lg:items-center justify-between gap-3">
         {/* Left: Segmented Mode Switch */}
-        <div className="flex items-center justify-between lg:justify-start gap-2">
+        <div className="flex items-center justify-between lg:justify-start gap-2 shrink-0">
           <ModeSwitch />
         </div>
 
         {/* Center: Context-Aware Explode Slider OR Flight Timeline Transport */}
-        <div className="flex-1 flex flex-col sm:flex-row items-stretch sm:items-center justify-center gap-3 px-1 lg:px-4">
+        <div className="flex-1 flex flex-col sm:flex-row items-stretch sm:items-center justify-center gap-3 px-1 lg:px-6">
           {!isFlightActive ? (
-            <div className="flex items-center gap-3 w-full max-w-md">
+            <div className="flex items-center gap-3.5 w-full max-w-xl">
               <button
                 type="button"
                 data-testid="explode-toggle"
                 disabled={!canExplode}
                 onClick={() => dispatch({ type: 'TOGGLE_EXPLODE' })}
-                className={`min-h-[44px] px-3.5 py-2 rounded-xl text-xs font-semibold border flex items-center gap-2 shrink-0 transition-colors ${
+                className={`min-h-[44px] px-3.5 py-2 rounded-xl text-xs font-semibold border flex items-center gap-2 shrink-0 whitespace-nowrap transition-colors ${
                   explodeProgress > 0.05
                     ? 'bg-[#17222E] text-[#67E5DF] border-[#67E5DF]/60'
                     : 'bg-[#070A0F] text-[#E9F0F5] border-[#2D3B49] hover:border-[#67E5DF]/50'
@@ -67,8 +74,8 @@ export const BottomTransport: React.FC = () => {
                 <span>{explodeProgress > 0.05 ? 'Lắp lại (0%)' : 'Tháo rời (100%)'}</span>
               </button>
 
-              <div className="flex-1 flex flex-col gap-1">
-                <div className="flex items-center justify-between text-[11px] font-mono">
+              <div className="flex-1 min-w-[160px] flex flex-col gap-1">
+                <div className="flex items-center justify-between text-[11px] font-mono whitespace-nowrap">
                   <label htmlFor="explode-range-slider" className="text-[#95A5B3]">
                     ĐỘ TÁCH CẤU TRÚC
                   </label>
@@ -101,7 +108,7 @@ export const BottomTransport: React.FC = () => {
           ) : (
             <div
               data-testid="flight-transport-controls"
-              className="flex items-center gap-2.5 w-full max-w-lg"
+              className="flex items-center gap-2.5 w-full max-w-xl"
             >
               <button
                 type="button"
@@ -112,7 +119,7 @@ export const BottomTransport: React.FC = () => {
                     type: flightPaused ? 'RESUME_FLIGHT' : 'PAUSE_FLIGHT',
                   })
                 }
-                className="min-h-[44px] min-w-[44px] px-3 py-2 rounded-xl bg-[#070A0F] border border-[#2D3B49] hover:border-[#67E5DF]/50 text-xs font-medium text-[#E9F0F5] inline-flex items-center justify-center gap-1.5"
+                className="min-h-[44px] min-w-[44px] px-3 py-2 rounded-xl bg-[#070A0F] border border-[#2D3B49] hover:border-[#67E5DF]/50 text-xs font-medium text-[#E9F0F5] inline-flex items-center justify-center gap-1.5 whitespace-nowrap"
               >
                 {flightPaused ? (
                   <>
@@ -131,7 +138,7 @@ export const BottomTransport: React.FC = () => {
                 type="button"
                 data-testid="flight-replay"
                 onClick={() => dispatch({ type: 'REPLAY_FLIGHT' })}
-                className="min-h-[44px] min-w-[44px] px-3 py-2 rounded-xl bg-[#070A0F] border border-[#2D3B49] hover:border-[#67E5DF]/50 text-xs font-medium text-[#E9F0F5] inline-flex items-center justify-center gap-1.5"
+                className="min-h-[44px] min-w-[44px] px-3 py-2 rounded-xl bg-[#070A0F] border border-[#2D3B49] hover:border-[#67E5DF]/50 text-xs font-medium text-[#E9F0F5] inline-flex items-center justify-center gap-1.5 whitespace-nowrap"
                 title="Phát lại chu trình biến hình từ 0.0s"
               >
                 <RotateCcw className="w-3.5 h-3.5 text-[#67E5DF]" />
@@ -139,8 +146,8 @@ export const BottomTransport: React.FC = () => {
               </button>
 
               {/* Progress Bar 0.0s - 7.0s */}
-              <div className="flex-1 flex flex-col gap-1 min-w-[110px]">
-                <div className="flex items-center justify-between text-[11px] font-mono">
+              <div className="flex-1 flex flex-col gap-1 min-w-[140px]">
+                <div className="flex items-center justify-between text-[11px] font-mono whitespace-nowrap">
                   <span className="text-[#FFBF81] font-semibold">{flightPhaseLabel}</span>
                   <span className="text-[#E9F0F5]">
                     {flightElapsedUi.toFixed(1)}s / {FLIGHT_DURATION_SECONDS.toFixed(1)}s
@@ -162,14 +169,19 @@ export const BottomTransport: React.FC = () => {
           )}
         </div>
 
-        {/* Right: Primary Action CTA + Camera Presets */}
-        <div className="flex flex-wrap items-center justify-between lg:justify-end gap-2.5">
-          <div className="hidden xl:block">
-            <CameraPresets />
-          </div>
-
+        {/* Right: Primary Action CTA */}
+        <div className="flex items-center justify-between lg:justify-end gap-2.5 shrink-0">
           {!isFlightActive ? (
-            <div className="flex flex-col items-end">
+            <div className="flex items-center gap-2.5">
+              {flightBlockedReason && (
+                <span
+                  data-testid="flight-blocked-hint"
+                  className="hidden md:inline-block text-[11px] font-mono text-[#FFBF81] bg-[#17222E]/90 border border-[#FFBF81]/30 px-2.5 py-1.5 rounded-lg max-w-[240px] truncate"
+                  title={flightBlockedReason}
+                >
+                  {flightBlockedReason}
+                </span>
+              )}
               <button
                 type="button"
                 data-testid="flight-start"
@@ -179,19 +191,11 @@ export const BottomTransport: React.FC = () => {
                   flightBlockedReason ??
                   'Khởi động chu trình biến hình cất cánh 7 giây (Phím F)'
                 }
-                className="min-h-[44px] px-4 py-2.5 rounded-xl bg-[#67E5DF] text-[#070A0F] font-bold text-xs uppercase tracking-wider inline-flex items-center gap-2 shadow-[0_0_24px_rgba(103,229,223,0.35)] hover:bg-[#67E5DF]/90 disabled:opacity-40 disabled:shadow-none disabled:cursor-not-allowed transition-all"
+                className="min-h-[44px] px-4 py-2.5 rounded-xl bg-[#67E5DF] text-[#070A0F] font-bold text-xs uppercase tracking-wider inline-flex items-center gap-2 whitespace-nowrap shadow-[0_0_24px_rgba(103,229,223,0.35)] hover:bg-[#67E5DF]/90 disabled:opacity-40 disabled:shadow-none disabled:cursor-not-allowed transition-all"
               >
                 <PlaneTakeoff className="w-4 h-4" />
                 <span>Mô phỏng bay</span>
               </button>
-              {flightBlockedReason && (
-                <span
-                  data-testid="flight-blocked-hint"
-                  className="text-[10px] font-mono text-[#FFBF81] mt-0.5"
-                >
-                  {flightBlockedReason}
-                </span>
-              )}
             </div>
           ) : (
             <button
@@ -204,7 +208,7 @@ export const BottomTransport: React.FC = () => {
                   ? 'Hạ càng đáp và đưa máy bay trở về bàn xoay trưng bày'
                   : 'Đang trong quá trình chuyển tiếp (chờ hoàn tất 7.0s)'
               }
-              className="min-h-[44px] px-4 py-2.5 rounded-xl bg-[#FFBF81] text-[#070A0F] font-bold text-xs uppercase tracking-wider inline-flex items-center gap-2 shadow-[0_0_24px_rgba(255,191,129,0.3)] hover:bg-[#FFBF81]/90 disabled:opacity-40 disabled:shadow-none disabled:cursor-not-allowed transition-all"
+              className="min-h-[44px] px-4 py-2.5 rounded-xl bg-[#FFBF81] text-[#070A0F] font-bold text-xs uppercase tracking-wider inline-flex items-center gap-2 whitespace-nowrap shadow-[0_0_24px_rgba(255,191,129,0.3)] hover:bg-[#FFBF81]/90 disabled:opacity-40 disabled:shadow-none disabled:cursor-not-allowed transition-all"
             >
               <PlaneLanding className="w-4 h-4" />
               <span>{mode === 'return-transition' ? 'Đang hạ cánh...' : 'Về trưng bày'}</span>
