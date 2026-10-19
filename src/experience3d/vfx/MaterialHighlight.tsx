@@ -43,6 +43,28 @@ export const MaterialHighlight: React.FC = () => {
       const shouldDim = isIsolated && selectedPartId !== null && !isSelected;
 
       obj.traverse((child) => {
+        if (child.userData.isCadEdge) {
+          const lineSeg = child as THREE.LineSegments;
+          const lineMat = lineSeg.material as THREE.LineBasicMaterial;
+          if (lineMat) {
+            if (isSelected) {
+              lineMat.color.setHex(0x67e5df);
+              lineMat.opacity = 0.96;
+            } else if (isHovered) {
+              lineMat.color.setHex(0x67e5df);
+              lineMat.opacity = 0.78;
+            } else if (shouldDim) {
+              lineMat.color.setHex(0x7c97ad);
+              lineMat.opacity = 0.1;
+            } else {
+              lineMat.color.setHex(0xc8e6f8);
+              lineMat.opacity = 0.44;
+            }
+            lineMat.needsUpdate = true;
+          }
+          return;
+        }
+
         if (!(child as THREE.Mesh).isMesh) return;
         const mesh = child as THREE.Mesh;
         const mats = Array.isArray(mesh.material) ? mesh.material : [mesh.material];
@@ -64,12 +86,12 @@ export const MaterialHighlight: React.FC = () => {
 
           if (isSelected) {
             stdMat.emissive.setHex(0x67e5df);
-            stdMat.emissiveIntensity = 0.55;
+            stdMat.emissiveIntensity = 0.42;
             stdMat.opacity = 1.0;
             stdMat.transparent = orig.transparent;
           } else if (isHovered) {
             stdMat.emissive.setHex(0x67e5df);
-            stdMat.emissiveIntensity = 0.25;
+            stdMat.emissiveIntensity = 0.22;
             stdMat.opacity = shouldDim ? 0.25 : orig.opacity;
             stdMat.transparent = shouldDim ? true : orig.transparent;
           } else if (shouldDim) {

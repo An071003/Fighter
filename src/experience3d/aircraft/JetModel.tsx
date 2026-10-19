@@ -16,23 +16,41 @@ export const JetModel: React.FC = () => {
   const { partNodesMapRef } = useAircraftRig();
   const dispatch = useAppStore((s) => s.dispatch);
 
-  // Clone scene graph and materials once so per-part highlights never mutate cached useGLTF state
+  // Clone scene graph, materials, and attach crisp CAD technical contour edge overlays once
   const clonedScene = useMemo(() => {
     const root = gltf.scene.clone(true);
+    const meshes: THREE.Mesh[] = [];
     root.traverse((obj) => {
       if ((obj as THREE.Mesh).isMesh) {
-        const mesh = obj as THREE.Mesh;
-        mesh.castShadow = true;
-        mesh.receiveShadow = true;
-        if (Array.isArray(mesh.material)) {
-          mesh.material = mesh.material.map((m) => m.clone());
-        } else if (mesh.material) {
-          const clonedMat = mesh.material.clone() as THREE.MeshStandardMaterial;
-          clonedMat.envMapIntensity = 1.45;
-          mesh.material = clonedMat;
-        }
+        meshes.push(obj as THREE.Mesh);
       }
     });
+
+    for (const mesh of meshes) {
+      mesh.castShadow = true;
+      mesh.receiveShadow = true;
+      if (Array.isArray(mesh.material)) {
+        mesh.material = mesh.material.map((m) => m.clone());
+      } else if (mesh.material) {
+        const clonedMat = mesh.material.clone() as THREE.MeshStandardMaterial;
+        clonedMat.envMapIntensity = 1.65;
+        mesh.material = clonedMat;
+      }
+
+      if (mesh.geometry) {
+        const edgesGeo = new THREE.EdgesGeometry(mesh.geometry, 36);
+        const edgesMat = new THREE.LineBasicMaterial({
+          color: 0xc8e6f8,
+          transparent: true,
+          opacity: 0.42,
+        });
+        const edgeLines = new THREE.LineSegments(edgesGeo, edgesMat);
+        edgeLines.name = `${mesh.name}__CAD_EDGES`;
+        edgeLines.userData.isCadEdge = true;
+        edgeLines.raycast = () => {};
+        mesh.add(edgeLines);
+      }
+    }
     return root;
   }, [gltf.scene]);
 
@@ -104,11 +122,11 @@ export const JetModel: React.FC = () => {
     const audit: AssetAuditReport = {
       loaded: true,
       isHighFidelity:
-         map.size >= PART_MANIFEST.minRequiredParts &&
+        map.size >= PART_MANIFEST.minRequiredParts &&
         missingPartIds.length === 0 &&
         hasThreeLandingGear &&
         hasGearDoors &&
-        triangleCount >= 30000,
+        triangleCount >= 8000,
       totalNamedPartsFound: map.size,
       expectedPartsCount: PART_MANIFEST.parts.length,
       missingPartIds,

@@ -124,6 +124,59 @@ export const Turntable: React.FC = () => {
         />
       </mesh>
 
+      {/* Longitudinal Amber Datum Centerline (Z-Axis Reference Line from Fig 1 Reference) */}
+      <mesh position={[0, 0.024, 0]}>
+        <boxGeometry args={[0.032, 0.004, 10.6]} />
+        <meshStandardMaterial
+          ref={registerMat}
+          color="#FF9E44"
+          emissive="#FF9E44"
+          emissiveIntensity={1.35}
+          roughness={0.2}
+        />
+      </mesh>
+
+      {/* Transverse Wheel-Axis Datum Line */}
+      <mesh position={[0, 0.023, 0.65]}>
+        <boxGeometry args={[7.4, 0.003, 0.022]} />
+        <meshStandardMaterial
+          ref={registerMat}
+          color="#67E5DF"
+          emissive="#67E5DF"
+          emissiveIntensity={0.65}
+          roughness={0.25}
+        />
+      </mesh>
+
+      {/* Runway / Stage Optical Alignment LED Nodes (Green Centerline + Blue Taxi Markers) */}
+      {[-4.6, -2.8, 2.4, 4.4].map((zPos, i) => (
+        <mesh key={`center-led-${i}`} position={[0, 0.028, zPos]}>
+          <cylinderGeometry args={[0.045, 0.055, 0.012, 16]} />
+          <meshStandardMaterial
+            ref={registerMat}
+            color="#4DFF9B"
+            emissive="#4DFF9B"
+            emissiveIntensity={2.4}
+          />
+        </mesh>
+      ))}
+      {[
+        [-1.85, -2.6],
+        [1.85, -2.6],
+        [-2.35, 1.45],
+        [2.35, 1.45],
+      ].map(([xPos, zPos], i) => (
+        <mesh key={`side-led-${i}`} position={[xPos, 0.028, zPos]}>
+          <cylinderGeometry args={[0.042, 0.052, 0.012, 16]} />
+          <meshStandardMaterial
+            ref={registerMat}
+            color="#3898FF"
+            emissive="#3898FF"
+            emissiveIntensity={2.4}
+          />
+        </mesh>
+      ))}
+
       {/* Instanced Radial Degree Tick Marks */}
       <instancedMesh
         ref={ticksMeshRef}
