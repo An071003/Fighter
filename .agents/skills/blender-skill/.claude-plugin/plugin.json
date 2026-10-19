@@ -1,0 +1,17 @@
+{
+  "name": "blender-skill",
+  "description": "Local, headless Blender 3D asset pipeline for coding agents: inspect, convert, optimize, render, bake and validate glb/gltf/fbx/obj/stl/usd/usdz/ply/abc files.",
+  "version": "0.31.0",
+  "author": {
+    "name": "kajisho5",
+    "url": "https://github.com/kajisho5"
+  },
+  "homepage": "https://github.com/kajisho5/blender-skill",
+  "repository": "https://github.com/kajisho5/blender-skill",
+  "license": "MIT",
+  "keywords": [
+    "blender",
+    "3d",
+    "skill"
+  ]
+}

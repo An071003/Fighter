@@ -1,0 +1,17 @@
+# Keeps GitHub Actions pins (actions/checkout@v4, etc.) and package.json's npm metadata
+# current, opening a PR for each update instead of letting either go stale silently.
+version: 2
+updates:
+  - package-ecosystem: "github-actions"
+    directory: "/"
+    schedule:
+      interval: "weekly"
+    commit-message:
+      prefix: "ci"
+
+  - package-ecosystem: "npm"
+    directory: "/"
+    schedule:
+      interval: "weekly"
+    commit-message:
+      prefix: "chore"

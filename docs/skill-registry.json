@@ -1,0 +1,56 @@
+{
+  "schemaVersion": "1.0.0",
+  "project": "AERIS X-9 — Simulations & Dynamics",
+  "updatedAt": "2026-10-19",
+  "localContractSkills": [
+    {
+      "id": "aircraft-3d-architecture",
+      "path": ".agents/skills/aircraft-3d-architecture/SKILL.md",
+      "domain": "3D Scene Graph, GLB Part Registry, Rest Pose Snapshot, Camera Ownership"
+    },
+    {
+      "id": "kinematic-visual-motion",
+      "path": ".agents/skills/kinematic-visual-motion/SKILL.md",
+      "domain": "Deterministic Exploded View, 0-7s Flight Timeline, Gear Choreography, Return Transition"
+    },
+    {
+      "id": "cinematic-vfx",
+      "path": ".agents/skills/cinematic-vfx/SKILL.md",
+      "domain": "Studio 3-Point PBR Lighting, Instanced Wind Streaks, Parallax Depth Layers, Quality Tiers"
+    },
+    {
+      "id": "ui-art-direction",
+      "path": ".agents/skills/ui-art-direction/SKILL.md",
+      "domain": "Awwwards Dark Industrial Editorial UI, Semantic Tokens, Typography, Responsive Drawer & Accessibility"
+    },
+    {
+      "id": "qa-webgl",
+      "path": ".agents/skills/qa-webgl/SKILL.md",
+      "domain": "Playwright Visual Verification, 20x Explode Reset Matrix Invariants, 10x Flight Cycles, Asset Provenance"
+    }
+  ],
+  "installedThirdPartySkills": [
+    { "id": "r3f-fundamentals", "path": ".agents/skills/r3f-fundamentals/SKILL.md", "source": "EnzeD/r3f-skills" },
+    { "id": "r3f-loaders", "path": ".agents/skills/r3f-loaders/SKILL.md", "source": "EnzeD/r3f-skills" },
+    { "id": "r3f-animation", "path": ".agents/skills/r3f-animation/SKILL.md", "source": "EnzeD/r3f-skills" },
+    { "id": "r3f-interaction", "path": ".agents/skills/r3f-interaction/SKILL.md", "source": "EnzeD/r3f-skills" },
+    { "id": "r3f-lighting", "path": ".agents/skills/r3f-lighting/SKILL.md", "source": "EnzeD/r3f-skills" },
+    { "id": "r3f-materials", "path": ".agents/skills/r3f-materials/SKILL.md", "source": "EnzeD/r3f-skills" },
+    { "id": "r3f-geometry", "path": ".agents/skills/r3f-geometry/SKILL.md", "source": "EnzeD/r3f-skills" },
+    { "id": "r3f-postprocessing", "path": ".agents/skills/r3f-postprocessing/SKILL.md", "source": "EnzeD/r3f-skills" },
+    { "id": "r3f-shaders", "path": ".agents/skills/r3f-shaders/SKILL.md", "source": "EnzeD/r3f-skills" },
+    { "id": "r3f-textures", "path": ".agents/skills/r3f-textures/SKILL.md", "source": "EnzeD/r3f-skills" },
+    { "id": "r3f-physics", "path": ".agents/skills/r3f-physics/SKILL.md", "source": "EnzeD/r3f-skills" },
+    { "id": "blender-skill", "path": ".agents/skills/blender-skill/SKILL.md", "source": "kajisho5/blender-skill" },
+    { "id": "gsap-core", "path": ".agents/skills/gsap-core/SKILL.md", "source": "greensock/gsap-skills" },
+    { "id": "gsap-timeline", "path": ".agents/skills/gsap-timeline/SKILL.md", "source": "greensock/gsap-skills" },
+    { "id": "gsap-react", "path": ".agents/skills/gsap-react/SKILL.md", "source": "greensock/gsap-skills" },
+    { "id": "gsap-performance", "path": ".agents/skills/gsap-performance/SKILL.md", "source": "greensock/gsap-skills" },
+    { "id": "gsap-plugins", "path": ".agents/skills/gsap-plugins/SKILL.md", "source": "greensock/gsap-skills" },
+    { "id": "gsap-scrolltrigger", "path": ".agents/skills/gsap-scrolltrigger/SKILL.md", "source": "greensock/gsap-skills" },
+    { "id": "gsap-utils", "path": ".agents/skills/gsap-utils/SKILL.md", "source": "greensock/gsap-skills" },
+    { "id": "gsap-frameworks", "path": ".agents/skills/gsap-frameworks/SKILL.md", "source": "greensock/gsap-skills" },
+    { "id": "motion-design", "path": ".agents/skills/motion-design/SKILL.md", "source": "LottieFiles/motion-design-skill" },
+    { "id": "awwwards-motion", "path": ".agents/skills/awwwards-motion/SKILL.md", "source": "adamperlis/awwwards-motion" }
+  ]
+}

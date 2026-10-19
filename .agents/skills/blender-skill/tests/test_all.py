@@ -1,0 +1,1987 @@
+#!/usr/bin/env python3
+"""End-to-end tests against a real Blender (stdlib unittest, no pytest dependency). Each test
+here mirrors a command that was run by hand against a real Blender 4.2.23/4.5.13/5.2.1 during
+development -- see git history for the exact transcripts. Needs Blender on PATH, $BLENDER, or
+--blender's default search (see scripts/_run.py); skips (not fails) if none is found, so a
+contributor without Blender installed still gets a clear signal instead of a wall of errors.
+
+Usage:
+  python3 tests/test_all.py
+"""
+import contextlib
+import io
+import json
+import shutil
+import struct
+import subprocess
+import sys
+import tempfile
+import unittest
+import zlib
+from pathlib import Path
+
+ROOT = Path(__file__).resolve().parent.parent
+FIXTURE = ROOT / "tests" / "fixtures" / "box.glb"
+BROKEN_FIXTURE = ROOT / "tests" / "fixtures" / "broken_cube.glb"
+FLIPPED_FIXTURE = ROOT / "tests" / "fixtures" / "flipped_cube.glb"
+SCALED_FIXTURE = ROOT / "tests" / "fixtures" / "scaled_cube.glb"
+OFFSET_ORIGIN_FIXTURE = ROOT / "tests" / "fixtures" / "offset_origin_cube.glb"
+ZERO_AREA_UV_FIXTURE = ROOT / "tests" / "fixtures" / "zero_area_uv_cube.glb"
+OVERLAPPING_UV_FIXTURE = ROOT / "tests" / "fixtures" / "overlapping_uv_cubes.glb"
+VERTEX_COLORS_FIXTURE = ROOT / "tests" / "fixtures" / "vertex_colors_cube.blend"
+ROOT_MOTION_FIXTURE = ROOT / "tests" / "fixtures" / "root_motion_rig.blend"
+UNWEIGHTED_VERTEX_FIXTURE = ROOT / "tests" / "fixtures" / "unweighted_vertex_cube.blend"
+MULTI_MATERIAL_FIXTURE = ROOT / "tests" / "fixtures" / "multi_material_cube.glb"
+MISCONFIGURED_TRANSPARENCY_FIXTURE = ROOT / "tests" / "fixtures" / "misconfigured_transparency.blend"
+DRACO_FIXTURE = ROOT / "tests" / "fixtures" / "box_draco.glb"
+DUPLICATE_MESH_FIXTURE = ROOT / "tests" / "fixtures" / "duplicate_mesh_scene.blend"
+sys.path.insert(0, str(ROOT / "scripts"))
+import _obj_mtl  # noqa: E402
+import _run  # noqa: E402
+import _usdz_validate  # noqa: E402
+
+USDZ_FIXTURE = ROOT / "tests" / "fixtures" / "box.usdz"
+BROKEN_USDZ_FIXTURE = ROOT / "tests" / "fixtures" / "box_broken.usdz"
+PHONG_OBJ_FIXTURE = ROOT / "tests" / "fixtures" / "phong_materials.obj"
+THIN_WALL_STL_FIXTURE = ROOT / "tests" / "fixtures" / "thin_wall_box.stl"
+POINT_CLOUD_FIXTURE = ROOT / "tests" / "fixtures" / "points.ply"
+DIRTY_CUBE_FIXTURE = ROOT / "tests" / "fixtures" / "dirty_cube.blend"
+WIRE_MESH_FIXTURE = ROOT / "tests" / "fixtures" / "wire_mesh.blend"
+TINY_LEGIT_TRIANGLE_FIXTURE = ROOT / "tests" / "fixtures" / "tiny_legit_triangle.blend"
+VERTEX_CACHE_QUAD_FIXTURE = ROOT / "tests" / "fixtures" / "vertex_cache_quad.blend"
+
+
+def _blender_available() -> bool:
+    try:
+        _run.find_blender()
+        return True
+    except Exception:
+        return False
+
+
+def run(*argv, cwd=None):
+    proc = subprocess.run([sys.executable, str(ROOT / "scripts" / argv[0])] + list(argv[1:]),
+                           capture_output=True, text=True, cwd=cwd)
+    return proc
+
+
+def _write_solid_png(path, w, h, rgb) -> None:
+    """A raw, uncompressed-color-data 8-bit RGB PNG (stdlib zlib/struct only, no Blender/numpy)
+    holding exactly the given byte triple at every pixel -- so a test's hand-computed expected
+    PSNR/SSIM can be derived from a known, exact rgb/255 float rather than whatever Blender's own
+    PNG encoder/color management would produce for a value like 0.5 (confirmed on a real Blender
+    4.2.23: bpy.data.images.load returns rgb/255 directly for a file built this way, with no sRGB
+    gamma curve applied despite the image's colorspace defaulting to "sRGB")."""
+    def chunk(tag: bytes, data: bytes) -> bytes:
+        return struct.pack(">I", len(data)) + tag + data + struct.pack(">I", zlib.crc32(tag + data) & 0xffffffff)
+
+    row = bytes([0]) + bytes(rgb) * w  # filter type 0 (None) prefix per scanline
+    ihdr = struct.pack(">IIBBBBB", w, h, 8, 2, 0, 0, 0)  # 8-bit depth, color type 2 = RGB
+    png = (b"\x89PNG\r\n\x1a\n" + chunk(b"IHDR", ihdr)
+           + chunk(b"IDAT", zlib.compress(row * h, 9)) + chunk(b"IEND", b""))
+    Path(path).write_bytes(png)
+
+
+def _png_dims(path) -> tuple:
+    """(width, height) read directly from a PNG file's own IHDR chunk (signature(8) + length(4)
+    + "IHDR"(4) = byte 16, then two big-endian uint32s) -- verifies the actual bytes on disk,
+    not just whatever a tool's own JSON claimed it wrote."""
+    with open(path, "rb") as f:
+        header = f.read(24)
+    return struct.unpack(">II", header[16:24])
+
+
+def _glb_image_png_bytes(path, image_index=0) -> bytes:
+    """The Nth embedded image's raw PNG file bytes, extracted directly from a .glb's own
+    JSON+BIN chunks -- what the exporter actually wrote to the container, not what Blender's own
+    in-memory Image datablock reports (which needs its lazy pixel data force-loaded first to
+    even have a non-zero .size -- see look.py)."""
+    with open(path, "rb") as f:
+        f.read(12)
+        json_len, _json_type = struct.unpack("<II", f.read(8))
+        gltf = json.loads(f.read(json_len))
+        bin_len, _bin_type = struct.unpack("<II", f.read(8))
+        bin_chunk = f.read(bin_len)
+    image = gltf["images"][image_index]
+    view = gltf["bufferViews"][image["bufferView"]]
+    offset = view.get("byteOffset", 0)
+    return bin_chunk[offset:offset + view["byteLength"]]
+
+
+def _glb_image_dims(path, image_index=0) -> tuple:
+    """(width, height) of the Nth embedded image in a .glb, read directly from its own IHDR
+    chunk."""
+    return struct.unpack(">II", _glb_image_png_bytes(path, image_index)[16:24])
+
+
+def _png_top_left_pixel(png_bytes: bytes) -> tuple:
+    """The raw (0-255) channel values of a PNG's own top-left pixel (x=0, y=0), decoded from its
+    compressed IDAT bytes. Does NOT need full per-scanline filter reconstruction (Sub/Up/
+    Average/Paeth): every PNG filter type's reconstruction formula for the very first pixel of
+    the first row uses only its left/up/upper-left neighbors, all of which are defined as 0 at
+    that corner (no pixel exists there) -- so Recon(0,0) == Filt(0,0) + predictor(0,0,0), and
+    every filter's own predictor of (0,0,0) is exactly 0, regardless of which filter type this
+    PNG actually used for that scanline. 8-bit depth, RGB/RGBA (color type 2/6) only -- what
+    this project's own PNG writers and Blender's own glTF exporter produce."""
+    bitdepth, colortype = struct.unpack(">BB", png_bytes[24:26])
+    channels = {2: 3, 6: 4}[colortype]
+    pos, idat = 8, b""
+    while pos < len(png_bytes):
+        length = struct.unpack(">I", png_bytes[pos:pos + 4])[0]
+        ctype = png_bytes[pos + 4:pos + 8]
+        if ctype == b"IDAT":
+            idat += png_bytes[pos + 8:pos + 8 + length]
+        pos += 8 + length + 4
+    raw = zlib.decompress(idat)
+    return tuple(raw[1:1 + channels])  # raw[0] is the scanline's own filter-type byte
+
+
+class TestUsdzValidate(unittest.TestCase):
+    """No Blender needed -- _usdz_validate reads a .usdz's own zip structure directly. The
+    negative case can't be driven through check.py's CLI end-to-end: Blender's own USD importer
+    refuses to even open a re-compressed usdz (confirmed: "Could not open USD archive for
+    reading"), so info.py -- which check.py always runs first -- fails before this module's
+    check would ever run. Testing the module directly is the only way to exercise that path.
+    """
+
+    def test_valid_usdz_passes(self):
+        # box.usdz: a real convert.py output (Blender's own USD exporter) -- uncompressed,
+        # 64-byte-aligned, as Apple's USDZ spec requires.
+        result = _usdz_validate.validate(str(USDZ_FIXTURE))
+        self.assertIsNotNone(result)
+        self.assertTrue(result["valid"])
+        self.assertEqual(result["issues"], [])
+        self.assertTrue(result["entries"][0]["stored"])
+        self.assertTrue(result["entries"][0]["aligned"])
+
+    def test_recompressed_usdz_fails(self):
+        # box_broken.usdz: the same content, re-zipped with Deflate compression -- violates both
+        # rules at once (not stored, and no longer 64-byte-aligned since Deflate changes the
+        # entry's size).
+        result = _usdz_validate.validate(str(BROKEN_USDZ_FIXTURE))
+        self.assertIsNotNone(result)
+        self.assertFalse(result["valid"])
+        self.assertFalse(result["entries"][0]["stored"])
+        self.assertFalse(result["entries"][0]["aligned"])
+
+
+class TestObjMtl(unittest.TestCase):
+    """No Blender needed -- _obj_mtl reads the raw .obj/.mtl files directly."""
+
+    def test_ns_to_roughness_matches_blenders_own_obj_importer(self):
+        # phong_materials.obj/.mtl: ShinyPlastic (Ns=200) and RoughMatte (Ns=5) -- roughness
+        # values here are 1 - sqrt(Ns/1000), confirmed byte-for-byte against what Blender's own
+        # wm.obj_import actually assigns to Principled BSDF's Roughness input for these exact Ns
+        # values (0.5527864.../0.9292893... within float32 rounding).
+        materials = _obj_mtl.read_materials(str(PHONG_OBJ_FIXTURE))
+        by_name = {m["name"]: m for m in materials}
+        self.assertAlmostEqual(by_name["ShinyPlastic"]["pbr_heuristic"]["roughness"], 0.5527864098548889, places=5)
+        self.assertAlmostEqual(by_name["RoughMatte"]["pbr_heuristic"]["roughness"], 0.9292893409729004, places=5)
+        # OBJ/MTL has no metallic channel -- never guessed, always 0.0.
+        self.assertEqual(by_name["ShinyPlastic"]["pbr_heuristic"]["metallic"], 0.0)
+        self.assertEqual(by_name["ShinyPlastic"]["pbr_heuristic"]["base_color"], [0.8, 0.2, 0.2])
+
+    def test_returns_none_without_a_mtllib_reference(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            obj = Path(tmp) / "no_mtl.obj"
+            obj.write_text("v 0 0 0\nv 1 0 0\nv 1 1 0\nf 1 2 3\n")
+            self.assertIsNone(_obj_mtl.read_materials(str(obj)))
+
+
+@unittest.skipUnless(_blender_available(), "no Blender found (see scripts/_run.py's search order)")
+class TestToolchain(unittest.TestCase):
+    def setUp(self):
+        self.tmp = tempfile.TemporaryDirectory()
+        self.addCleanup(self.tmp.cleanup)
+        self.out = Path(self.tmp.name)
+
+    def test_info_reports_box_geometry(self):
+        proc = run("info.py", str(FIXTURE), "--json")
+        self.assertEqual(proc.returncode, 0, proc.stderr)
+        data = json.loads(proc.stdout)
+        self.assertEqual(data["meshes"]["triangles"], 12)
+        self.assertEqual(data["meshes"]["vertices"], 24)
+        # A closed cube is manifold once split normals/UV seams are welded first (info.py's
+        # whole point: raw topology alone would call every hard edge "non-manifold").
+        self.assertEqual(data["meshes"]["per_object"][0]["non_manifold_edges"], 0)
+
+    def test_info_detects_hole_and_skips_unreliable_flip_check(self):
+        # broken_cube.glb: a cube with one face deleted (a real hole/gap) and one remaining
+        # face's normal manually inverted. The hole makes the mesh non-manifold, which in turn
+        # makes the flipped-normal comparison unreliable (see references/pitfalls.md -- verified
+        # on a real character mesh that "fixing" flipped normals on a non-manifold mesh can
+        # actually corrupt a correctly-shaded model), so info.py must report that check as
+        # skipped (None) rather than guessing.
+        proc = run("info.py", str(BROKEN_FIXTURE), "--json")
+        self.assertEqual(proc.returncode, 0, proc.stderr)
+        stats = json.loads(proc.stdout)["meshes"]["per_object"][0]
+        self.assertEqual(stats["non_manifold_edges"], 4)
+        self.assertEqual(stats["boundary_edges"], 4)
+        self.assertIsNone(stats["flipped_normal_faces"])
+
+    def test_info_detects_flipped_normals_on_a_manifold_mesh(self):
+        # flipped_cube.glb: a plain closed cube with every face normal manually inverted --
+        # manifold (no holes), so the flipped-normal check is trustworthy here and should fire.
+        proc = run("info.py", str(FLIPPED_FIXTURE), "--json")
+        self.assertEqual(proc.returncode, 0, proc.stderr)
+        stats = json.loads(proc.stdout)["meshes"]["per_object"][0]
+        self.assertEqual(stats["non_manifold_edges"], 0)
+        self.assertEqual(stats["flipped_normal_faces"], 12)
+
+    def test_optimize_fill_holes_and_recalc_normals_fixes_broken_cube(self):
+        out = self.out / "fixed.glb"
+        proc = run("optimize.py", str(BROKEN_FIXTURE), "-o", str(out), "--fill-holes", "--recalc-normals", "--json")
+        self.assertEqual(proc.returncode, 0, proc.stderr)
+        data = json.loads(proc.stdout)
+        self.assertEqual(data["holes_filled"], 1)
+        self.assertEqual(data["warnings"], [])  # mesh was manifold again before recalc ran
+
+        verify = run("info.py", str(out), "--json")
+        stats = json.loads(verify.stdout)["meshes"]["per_object"][0]
+        self.assertEqual(stats["non_manifold_edges"], 0)
+        self.assertEqual(stats["flipped_normal_faces"], 0)
+
+    def test_optimize_recalc_normals_warns_on_non_manifold_mesh(self):
+        # Applying --recalc-normals directly to a still-non-manifold mesh (no --fill-holes first)
+        # must warn rather than silently trust the result -- this is the same unreliable-fix
+        # case test_info_detects_hole_and_skips_unreliable_flip_check guards on the read side.
+        out = self.out / "still_broken.glb"
+        proc = run("optimize.py", str(BROKEN_FIXTURE), "-o", str(out), "--recalc-normals", "--json")
+        self.assertEqual(proc.returncode, 0, proc.stderr)
+        data = json.loads(proc.stdout)
+        self.assertEqual(len(data["warnings"]), 1)
+        self.assertIn("non-manifold", data["warnings"][0])
+
+    def test_info_detects_unapplied_scale_and_optimize_fixes_it(self):
+        # scaled_cube.glb: a cube with object.scale (0.01, 0.01, 0.01) never baked in -- the
+        # classic cm/m unit-mismatch symptom, which glTF round-trips faithfully as a node scale
+        # rather than silently applying it.
+        proc = run("info.py", str(SCALED_FIXTURE), "--json")
+        self.assertEqual(proc.returncode, 0, proc.stderr)
+        data = json.loads(proc.stdout)
+        stats = data["meshes"]["per_object"][0]
+        self.assertAlmostEqual(stats["scale"][0], 0.01, places=4)
+        self.assertTrue(any("unapplied scale" in w for w in data["warnings"]))
+
+        out = self.out / "scale_fixed.glb"
+        proc = run("optimize.py", str(SCALED_FIXTURE), "-o", str(out), "--fix-scale", "--json")
+        self.assertEqual(proc.returncode, 0, proc.stderr)
+        self.assertEqual(json.loads(proc.stdout)["scales_fixed"], 1)
+
+        verify = run("info.py", str(out), "--json")
+        fixed_stats = json.loads(verify.stdout)["meshes"]["per_object"][0]
+        self.assertEqual(fixed_stats["scale"], [1.0, 1.0, 1.0])
+
+    def test_optimize_origin_center_and_bottom_recenter_without_moving_geometry(self):
+        # offset_origin_cube.glb: a cube whose origin sits 3 units away from its own geometry's
+        # local center (a deliberately off-center pivot, not a defect -- info.py reports this as
+        # data, not a warning; see _local_bbox_reference_points in scripts/bpy/info.py).
+        before = json.loads(run("info.py", str(OFFSET_ORIGIN_FIXTURE), "--json").stdout)
+        self.assertEqual(before["meshes"]["per_object"][0]["origin_offset_from_center"], [3.0, 0.0, 0.0])
+        world_bbox_before = before["bounding_box"]
+
+        out = self.out / "origin_center.glb"
+        proc = run("optimize.py", str(OFFSET_ORIGIN_FIXTURE), "-o", str(out), "--origin", "center", "--json")
+        self.assertEqual(proc.returncode, 0, proc.stderr)
+
+        after = json.loads(run("info.py", str(out), "--json").stdout)
+        self.assertEqual(after["meshes"]["per_object"][0]["origin_offset_from_center"], [0.0, 0.0, 0.0])
+        # The whole point of origin_set over moving the object: world-space geometry is
+        # untouched, only the origin moves within the object's local frame.
+        self.assertEqual(after["bounding_box"], world_bbox_before)
+
+        out_bottom = self.out / "origin_bottom.glb"
+        proc = run("optimize.py", str(OFFSET_ORIGIN_FIXTURE), "-o", str(out_bottom), "--origin", "bottom", "--json")
+        self.assertEqual(proc.returncode, 0, proc.stderr)
+        after_bottom = json.loads(run("info.py", str(out_bottom), "--json").stdout)
+        self.assertEqual(after_bottom["meshes"]["per_object"][0]["origin_offset_from_bottom_center"], [0.0, 0.0, 0.0])
+        self.assertEqual(after_bottom["bounding_box"], world_bbox_before)
+
+    def test_info_detects_zero_area_uv_and_no_false_positive_overlap(self):
+        # zero_area_uv_cube.glb: every face's UV collapsed to a single point -- never
+        # meaningfully unwrapped. Confirmed not to also spuriously register as UV overlap
+        # (degenerate faces are excluded from the overlap scan, not double-counted).
+        proc = run("info.py", str(ZERO_AREA_UV_FIXTURE), "--json")
+        self.assertEqual(proc.returncode, 0, proc.stderr)
+        data = json.loads(proc.stdout)
+        uv = data["meshes"]["per_object"][0]["uv_checks"]
+        self.assertEqual(uv["zero_area_faces"], 12)
+        self.assertEqual(uv["overlapping_faces_approx"], 0)
+        self.assertTrue(any("zero-area UVs" in w for w in data["warnings"]))
+
+    def test_info_detects_overlapping_uv_islands(self):
+        # overlapping_uv_cubes.glb: two cubes joined into one mesh, with the second island's UVs
+        # deliberately copied on top of the first's -- a real, if unusual, full overlap.
+        proc = run("info.py", str(OVERLAPPING_UV_FIXTURE), "--json")
+        self.assertEqual(proc.returncode, 0, proc.stderr)
+        data = json.loads(proc.stdout)
+        uv = data["meshes"]["per_object"][0]["uv_checks"]
+        self.assertEqual(uv["overlapping_faces_approx"], 12)
+        self.assertTrue(any("overlapping UVs" in w for w in data["warnings"]))
+
+    def test_info_skip_uv_overlap_check_returns_null_instead_of_the_real_count(self):
+        # Same overlapping_uv_cubes.glb as the test above (12 real overlapping faces), but with
+        # --skip-uv-overlap-check: overlapping_faces_approx must read null/None (not computed,
+        # never a wrong "0"), while zero_area_faces stays a real, always-computed number (that
+        # scan is a cheap O(n) single pass, never skipped) -- confirms the flag skips only the
+        # genuinely expensive O(n^2) overlap scan itself, not the whole uv_checks block.
+        proc = run("info.py", str(OVERLAPPING_UV_FIXTURE), "--skip-uv-overlap-check", "--json")
+        self.assertEqual(proc.returncode, 0, proc.stderr)
+        uv = json.loads(proc.stdout)["meshes"]["per_object"][0]["uv_checks"]
+        self.assertIsNone(uv["overlapping_faces_approx"])
+        self.assertEqual(uv["zero_area_faces"], 0)
+
+    def test_info_uv_checks_have_no_false_positives_on_a_real_character_mesh(self):
+        # fox.glb: a real, cleanly-laid-out UV map. A naive bounding-box-only overlap filter
+        # falsely flagged 273/576 faces here during development (see references/pitfalls.md) --
+        # the exact 2D triangle-overlap test must read 0.
+        proc = run("info.py", str(ROOT / "tests" / "fixtures" / "fox.glb"), "--json")
+        self.assertEqual(proc.returncode, 0, proc.stderr)
+        uv = json.loads(proc.stdout)["meshes"]["per_object"][0]["uv_checks"]
+        self.assertEqual(uv["overlapping_faces_approx"], 0)
+        self.assertEqual(uv["zero_area_faces"], 0)
+
+    def test_info_lists_vertex_colors_and_custom_attributes(self):
+        # vertex_colors_cube.blend: one vertex color layer plus two genuinely custom mesh
+        # attributes (a per-vertex float, a per-face int), alongside Blender's own non-internal
+        # built-ins (position, material_index, bevel_weight_edge, crease_edge, UVMap -- none of
+        # which should show up here). A .blend fixture, not .glb: glTF export drops generic
+        # custom attributes entirely (confirmed -- see references/pitfalls.md), so a glb fixture
+        # could never exercise custom_attributes at all.
+        proc = run("info.py", str(VERTEX_COLORS_FIXTURE), "--json")
+        self.assertEqual(proc.returncode, 0, proc.stderr)
+        stats = json.loads(proc.stdout)["meshes"]["per_object"][0]
+        self.assertEqual([vc["name"] for vc in stats["vertex_colors"]], ["Col"])
+        self.assertEqual(
+            {(a["name"], a["data_type"]) for a in stats["custom_attributes"]},
+            {("my_weight", "FLOAT"), ("my_id", "INT")},
+        )
+
+    def test_info_reports_no_vertex_colors_or_custom_attributes_on_plain_fixtures(self):
+        for fixture in (FIXTURE, ROOT / "tests" / "fixtures" / "fox.glb"):
+            proc = run("info.py", str(fixture), "--json")
+            self.assertEqual(proc.returncode, 0, proc.stderr)
+            for stats in json.loads(proc.stdout)["meshes"]["per_object"]:
+                self.assertEqual(stats["vertex_colors"], [])
+                self.assertEqual(stats["custom_attributes"], [])
+
+    def test_info_reports_bone_count_and_no_root_motion_on_a_real_character_mesh(self):
+        # fox.glb: 3 actions, each animating 20 of the armature's 24 bones via
+        # pose.bones["<name>"].<prop> fcurves, none of which ever key the root bone
+        # ("_rootJoint")'s own location -- these are in-place cycles meant to be driven
+        # externally, so root_motion must read False for all three, not just non-crash.
+        proc = run("info.py", str(ROOT / "tests" / "fixtures" / "fox.glb"), "--json")
+        self.assertEqual(proc.returncode, 0, proc.stderr)
+        animations = json.loads(proc.stdout)["animations"]
+        self.assertEqual(len(animations), 3)
+        for anim in animations:
+            self.assertEqual(anim["bone_count"], 20)
+            self.assertFalse(anim["root_motion"])
+
+    def test_info_detects_root_motion_on_a_synthetic_rig(self):
+        # root_motion_rig.blend: a 2-bone armature ("root" parented by nothing, "child" parented
+        # to "root") with two actions -- RootMotionWalk keyframes the root bone's own location
+        # (real root motion), InPlaceIdle only keyframes the child bone's rotation (an in-place
+        # pose, root_motion must stay False even though a bone is animated).
+        proc = run("info.py", str(ROOT_MOTION_FIXTURE), "--json")
+        self.assertEqual(proc.returncode, 0, proc.stderr)
+        animations = {a["name"]: a for a in json.loads(proc.stdout)["animations"]}
+        self.assertEqual(animations["RootMotionWalk"]["bone_count"], 2)
+        self.assertTrue(animations["RootMotionWalk"]["root_motion"])
+        self.assertEqual(animations["InPlaceIdle"]["bone_count"], 1)
+        self.assertFalse(animations["InPlaceIdle"]["root_motion"])
+
+    def test_info_reports_bone_hierarchy(self):
+        # fox.glb: 24 bones, root "_rootJoint" with no parent, everything else chained under it
+        # (confirmed real numbers -- b_Root_00 -> _rootJoint -> None).
+        proc = run("info.py", str(ROOT / "tests" / "fixtures" / "fox.glb"), "--json")
+        self.assertEqual(proc.returncode, 0, proc.stderr)
+        armatures = json.loads(proc.stdout)["armatures"]
+        self.assertEqual(len(armatures), 1)
+        bones = {b["name"]: b["parent"] for b in armatures[0]["bones"]}
+        self.assertEqual(len(bones), 24)
+        self.assertIsNone(bones["_rootJoint"])
+        self.assertEqual(bones["b_Root_00"], "_rootJoint")
+
+    def test_info_detects_unweighted_vertex_on_a_skinned_mesh(self):
+        # unweighted_vertex_cube.blend: a cube parented to a 1-bone armature (auto-weighted),
+        # with vertex 0's weight explicitly removed afterward -- a real "won't move with the
+        # rig" defect, distinct from a mesh that was never meant to be skinned at all.
+        proc = run("info.py", str(UNWEIGHTED_VERTEX_FIXTURE), "--json")
+        self.assertEqual(proc.returncode, 0, proc.stderr)
+        data = json.loads(proc.stdout)
+        stats = data["meshes"]["per_object"][0]
+        self.assertEqual(stats["unweighted_vertices"], 1)
+        self.assertTrue(any("no bone weight" in w for w in data["warnings"]))
+
+    def test_info_skips_unweighted_check_on_non_skinned_meshes(self):
+        # box.glb has no armature at all -- unweighted_vertices must be None (not skipped
+        # silently as 0, and not every vertex flagged as a false-positive defect).
+        proc = run("info.py", str(FIXTURE), "--json")
+        self.assertEqual(proc.returncode, 0, proc.stderr)
+        for stats in json.loads(proc.stdout)["meshes"]["per_object"]:
+            self.assertIsNone(stats["unweighted_vertices"])
+
+    def test_info_suggests_lod_ratios_from_triangle_count(self):
+        # box.glb: 12 triangles -- LOD1/2/3 at 50%/25%/10% of that (real numbers: 6/3/1).
+        proc = run("info.py", str(FIXTURE), "--json")
+        self.assertEqual(proc.returncode, 0, proc.stderr)
+        data = json.loads(proc.stdout)
+        self.assertEqual(data["meshes"]["triangles"], 12)
+        suggestions = {s["level"]: s["target_triangles"] for s in data["meshes"]["lod_suggestions"]}
+        self.assertEqual(suggestions, {"LOD1": 6, "LOD2": 3, "LOD3": 1})
+
+    def test_info_estimates_one_draw_call_per_object_with_a_single_material(self):
+        # fox.glb: 2 mesh objects, each using exactly one material's worth of faces (the
+        # "Icosphere" eye mesh has no material slots at all but every face still reads
+        # material_index 0 -- still one real draw call, not zero).
+        proc = run("info.py", str(ROOT / "tests" / "fixtures" / "fox.glb"), "--json")
+        self.assertEqual(proc.returncode, 0, proc.stderr)
+        data = json.loads(proc.stdout)
+        for stats in data["meshes"]["per_object"]:
+            self.assertEqual(stats["draw_calls_estimate"], 1)
+        self.assertEqual(data["meshes"]["draw_calls_estimate"], 2)
+
+    def test_info_estimates_multiple_draw_calls_for_one_object_with_multiple_materials(self):
+        # multi_material_cube.glb: a single cube object with 2 materials assigned to alternating
+        # faces -- the real per-object batching unit is 2 draw calls, not 1 (naive "one draw call
+        # per object") and not "materials x objects" (2 materials x 1 object would coincidentally
+        # also read 2 here, but that formula breaks as soon as objects share materials -- this
+        # checks the actual per-object material-usage count, not that coincidental product).
+        proc = run("info.py", str(MULTI_MATERIAL_FIXTURE), "--json")
+        self.assertEqual(proc.returncode, 0, proc.stderr)
+        data = json.loads(proc.stdout)
+        self.assertEqual(data["meshes"]["per_object"][0]["draw_calls_estimate"], 2)
+        self.assertEqual(data["meshes"]["draw_calls_estimate"], 2)
+
+    def test_info_detects_misconfigured_transparent_material(self):
+        # misconfigured_transparency.blend: a plane material with a hard binary-alpha mask
+        # texture (leaf cutout, values only 0.0/1.0) but surface_render_method left at BLENDED
+        # (real alpha blending) instead of DITHERED -- a real "should be a cheap cutout, not an
+        # expensive/sorting-order-fragile real blend" defect.
+        proc = run("info.py", str(MISCONFIGURED_TRANSPARENCY_FIXTURE), "--json")
+        self.assertEqual(proc.returncode, 0, proc.stderr)
+        data = json.loads(proc.stdout)
+        issues = data["materials"]["transparency_issues"]
+        self.assertEqual(len(issues), 1)
+        self.assertEqual(issues[0]["material"], "FoliageMisconfigured")
+        self.assertTrue(any("hard mask" in w for w in data["warnings"]))
+
+    def test_info_reports_no_transparency_issues_on_plain_fixtures(self):
+        for fixture in (FIXTURE, ROOT / "tests" / "fixtures" / "fox.glb"):
+            proc = run("info.py", str(fixture), "--json")
+            self.assertEqual(proc.returncode, 0, proc.stderr)
+            self.assertEqual(json.loads(proc.stdout)["materials"]["transparency_issues"], [])
+
+    def test_info_lists_gltf_extensions_from_the_raw_file(self):
+        # box_draco.glb: a real Draco-compressed export (via optimize.py --draco), so its
+        # extensionsUsed/extensionsRequired genuinely contain KHR_draco_mesh_compression --
+        # parsed from the file's own JSON chunk, not inferred from Blender's imported state
+        # (which doesn't expose which KHR_* extensions the source file declared).
+        proc = run("info.py", str(DRACO_FIXTURE), "--json")
+        self.assertEqual(proc.returncode, 0, proc.stderr)
+        ext = json.loads(proc.stdout)["gltf_extensions"]
+        self.assertEqual(ext["used"], ["KHR_draco_mesh_compression"])
+        self.assertEqual(ext["required"], ["KHR_draco_mesh_compression"])
+        self.assertIn("Draco", ext["descriptions"]["KHR_draco_mesh_compression"])
+
+    def test_info_reports_no_gltf_extensions_on_a_plain_glb_and_none_for_non_gltf(self):
+        proc = run("info.py", str(FIXTURE), "--json")
+        self.assertEqual(proc.returncode, 0, proc.stderr)
+        ext = json.loads(proc.stdout)["gltf_extensions"]
+        self.assertEqual(ext["used"], [])
+        self.assertEqual(ext["required"], [])
+
+        proc = run("info.py", str(VERTEX_COLORS_FIXTURE), "--json")
+        self.assertEqual(proc.returncode, 0, proc.stderr)
+        self.assertIsNone(json.loads(proc.stdout)["gltf_extensions"])
+
+    def test_info_detects_already_instanced_and_duplicate_mesh_candidates(self):
+        # duplicate_mesh_scene.blend: CubeA and CubeB are a linked duplicate (literally the same
+        # Mesh datablock -- already properly instanced); CubeC is an independently-created cube
+        # of the same size (separate datablock, identical geometry -- a real "could share one
+        # datablock" candidate); SphereD is genuinely different geometry and must appear in
+        # neither group.
+        proc = run("info.py", str(DUPLICATE_MESH_FIXTURE), "--json")
+        self.assertEqual(proc.returncode, 0, proc.stderr)
+        data = json.loads(proc.stdout)
+        instancing = data["instancing"]
+        self.assertEqual(len(instancing["already_instanced"]), 1)
+        self.assertEqual(set(instancing["already_instanced"][0]["objects"]), {"CubeA", "CubeB"})
+        self.assertEqual(len(instancing["duplicate_mesh_candidates"]), 1)
+        candidate = instancing["duplicate_mesh_candidates"][0]
+        self.assertEqual(set(candidate["objects"]), {"CubeA", "CubeC"})
+        self.assertEqual(candidate["vertices"], 8)
+        self.assertEqual(candidate["triangles"], 12)
+        self.assertTrue(any("could share one datablock" in w for w in data["warnings"]))
+
+    def test_info_reports_no_instancing_data_on_plain_fixtures(self):
+        for fixture in (FIXTURE, ROOT / "tests" / "fixtures" / "fox.glb"):
+            proc = run("info.py", str(fixture), "--json")
+            self.assertEqual(proc.returncode, 0, proc.stderr)
+            instancing = json.loads(proc.stdout)["instancing"]
+            self.assertEqual(instancing["already_instanced"], [])
+            self.assertEqual(instancing["duplicate_mesh_candidates"], [])
+
+    def test_check_ios_ar_target_validates_usdz_package_structure(self):
+        # A real convert.py --draco... no, a plain usdz export -- confirms check.py's ios-ar
+        # target actually runs the USDZ-package-structure row (RM-016) on a real Blender-produced
+        # file, not just that the standalone validator works in isolation.
+        usdz = self.out / "box.usdz"
+        proc = run("convert.py", str(FIXTURE), "-o", str(usdz))
+        self.assertEqual(proc.returncode, 0, proc.stderr)
+        proc = run("check.py", str(usdz), "--target", "ios-ar", "--json")
+        self.assertEqual(proc.returncode, 1, proc.stderr)  # UV-map FAIL on box.glb's unwrapped cube, unrelated to this row
+        rows = {r["check"]: r for r in json.loads(proc.stdout)["checks"]}
+        self.assertEqual(rows["USDZ package"]["status"], "PASS")
+
+    def test_info_reports_obj_pbr_heuristic_matching_the_real_blender_import(self):
+        proc = run("info.py", str(PHONG_OBJ_FIXTURE), "--json")
+        self.assertEqual(proc.returncode, 0, proc.stderr)
+        data = json.loads(proc.stdout)
+        by_name = {m["name"]: m for m in data["obj_materials"]}
+        self.assertAlmostEqual(by_name["ShinyPlastic"]["pbr_heuristic"]["roughness"], 0.5527864098548889, places=5)
+        # Convert the same file through Blender and read back the actual glTF
+        # pbrMetallicRoughness.roughnessFactor it wrote, confirming info.py's reported heuristic
+        # isn't just an isolated formula but genuinely matches what this skill's own convert.py
+        # pipeline produces end to end.
+        out = self.out / "phong.glb"
+        proc = run("convert.py", str(PHONG_OBJ_FIXTURE), "-o", str(out), "--json")
+        self.assertEqual(proc.returncode, 0, proc.stderr)
+        import struct as _struct
+        with open(out, "rb") as f:
+            _magic, _version, _length = _struct.unpack("<4sII", f.read(12))
+            chunk_len, _chunk_type = _struct.unpack("<II", f.read(8))
+            gltf = json.loads(f.read(chunk_len))
+        exported = {m["name"]: m["pbrMetallicRoughness"]["roughnessFactor"] for m in gltf["materials"]}
+        self.assertAlmostEqual(exported["ShinyPlastic"], by_name["ShinyPlastic"]["pbr_heuristic"]["roughness"], places=5)
+        self.assertAlmostEqual(exported["RoughMatte"], by_name["RoughMatte"]["pbr_heuristic"]["roughness"], places=5)
+
+    def test_info_reports_none_obj_materials_for_non_obj_formats(self):
+        proc = run("info.py", str(FIXTURE), "--json")
+        self.assertEqual(proc.returncode, 0, proc.stderr)
+        self.assertIsNone(json.loads(proc.stdout)["obj_materials"])
+
+    def test_info_detects_thin_wall_via_ray_cast_thickness(self):
+        # thin_wall_box.stl: a hollow cube (boolean-differenced) with a real 0.3-unit wall on
+        # every side -- ray-cast thickness analysis should read close to 0.3 (minus the small
+        # epsilon offset), not the outer box's 10-unit size.
+        proc = run("info.py", str(THIN_WALL_STL_FIXTURE), "--json")
+        self.assertEqual(proc.returncode, 0, proc.stderr)
+        stats = json.loads(proc.stdout)["meshes"]["per_object"][0]
+        self.assertLess(stats["wall_thickness_min"], 0.31)
+        self.assertGreater(stats["wall_thickness_min"], 0.29)
+
+    def test_info_reports_full_thickness_on_a_solid_mesh(self):
+        # box.glb: an ordinary solid cube -- a ray cast from any face should reach all the way
+        # to the opposite face, not read as "thin".
+        proc = run("info.py", str(FIXTURE), "--json")
+        self.assertEqual(proc.returncode, 0, proc.stderr)
+        stats = json.loads(proc.stdout)["meshes"]["per_object"][0]
+        self.assertGreater(stats["wall_thickness_min"], 0.9)
+
+    def test_check_3d_print_target_flags_thin_walls(self):
+        out = self.out / "thin.stl"
+        proc = run("convert.py", str(THIN_WALL_STL_FIXTURE), "-o", str(out))
+        self.assertEqual(proc.returncode, 0, proc.stderr)
+        proc = run("check.py", str(out), "--target", "3d-print", "--json")
+        rows = {r["check"]: r for r in json.loads(proc.stdout)["checks"]}
+        self.assertEqual(rows["wall thickness"]["status"], "WARN")
+
+        thick_out = self.out / "thick.stl"
+        proc = run("convert.py", str(FIXTURE), "-o", str(thick_out))
+        self.assertEqual(proc.returncode, 0, proc.stderr)
+        proc = run("check.py", str(thick_out), "--target", "3d-print", "--json")
+        rows = {r["check"]: r for r in json.loads(proc.stdout)["checks"]}
+        self.assertEqual(rows["wall thickness"]["status"], "PASS")
+
+    def test_info_detects_a_pure_point_cloud_and_skips_its_uv_warning(self):
+        # points.ply: 1000 vertices, 0 faces at all (real photogrammetry/LiDAR-style data) --
+        # is_point_cloud must read True, and the usual "no UV map" warning (meaningless for a
+        # point cloud) must not fire.
+        proc = run("info.py", str(POINT_CLOUD_FIXTURE), "--json")
+        self.assertEqual(proc.returncode, 0, proc.stderr)
+        data = json.loads(proc.stdout)
+        stats = data["meshes"]["per_object"][0]
+        self.assertEqual(stats["vertices"], 1000)
+        self.assertEqual(stats["triangles"], 0)
+        self.assertTrue(stats["is_point_cloud"])
+        self.assertFalse(any("no UV map" in w for w in data["warnings"]))
+
+    def test_info_reports_false_is_point_cloud_on_an_ordinary_mesh(self):
+        proc = run("info.py", str(FIXTURE), "--json")
+        self.assertEqual(proc.returncode, 0, proc.stderr)
+        self.assertFalse(json.loads(proc.stdout)["meshes"]["per_object"][0]["is_point_cloud"])
+
+    def test_optimize_point_thin_voxel_reduces_point_cloud_density(self):
+        out = self.out / "points_thin.ply"
+        proc = run("optimize.py", str(POINT_CLOUD_FIXTURE), "-o", str(out), "--point-thin-voxel", "1.0", "--json")
+        self.assertEqual(proc.returncode, 0, proc.stderr)
+        data = json.loads(proc.stdout)
+        self.assertGreater(data["points_thinned"], 0)
+        proc = run("info.py", str(out), "--json")
+        remaining = json.loads(proc.stdout)["meshes"]["per_object"][0]["vertices"]
+        self.assertEqual(remaining, 1000 - data["points_thinned"])
+        self.assertLess(remaining, 1000)
+
+    def test_optimize_point_thin_voxel_is_a_noop_on_a_real_mesh(self):
+        # A mesh with actual faces isn't a point cloud -- --point-thin-voxel must leave its
+        # vertex count untouched (--decimate-ratio is the tool for that case).
+        out = self.out / "box_thin.glb"
+        proc = run("optimize.py", str(FIXTURE), "-o", str(out), "--point-thin-voxel", "1.0", "--json")
+        self.assertEqual(proc.returncode, 0, proc.stderr)
+        self.assertEqual(json.loads(proc.stdout)["points_thinned"], 0)
+        proc = run("info.py", str(out), "--json")
+        self.assertEqual(json.loads(proc.stdout)["meshes"]["per_object"][0]["vertices"], 24)
+
+    def test_optimize_webp_converts_texture_and_reports_measured_size(self):
+        # fox.glb's one PNG texture (26764 bytes, real measured number) actually grows to 30060
+        # bytes as WebP at Blender's own default quality (75) -- a real, confirmed finding
+        # (references/pitfalls.md), not a hypothetical -- so this pins the measured before/after,
+        # never a claimed reduction.
+        out = self.out / "fox_webp.glb"
+        proc = run("optimize.py", str(ROOT / "tests" / "fixtures" / "fox.glb"), "-o", str(out), "--webp", "--json")
+        self.assertEqual(proc.returncode, 0, proc.stderr)
+        data = json.loads(proc.stdout)
+        self.assertEqual(data["texture_bytes_before"], 26764)
+        self.assertEqual(data["texture_bytes_after"], 30060)
+        # And the output genuinely declares the glTF extension this conversion adds.
+        proc = run("info.py", str(out), "--json")
+        ext = json.loads(proc.stdout)["gltf_extensions"]
+        self.assertEqual(ext["used"], ["EXT_texture_webp"])
+
+    def test_optimize_webp_quality_flag_actually_changes_output_size(self):
+        out = self.out / "fox_webp_q30.glb"
+        proc = run("optimize.py", str(ROOT / "tests" / "fixtures" / "fox.glb"), "-o", str(out), "--webp", "--webp-quality", "30", "--json")
+        self.assertEqual(proc.returncode, 0, proc.stderr)
+        data = json.loads(proc.stdout)
+        self.assertLess(data["texture_bytes_after"], data["texture_bytes_before"])
+
+    def test_optimize_webp_rejects_non_gltf_output(self):
+        out = self.out / "fox_webp.stl"
+        proc = run("optimize.py", str(ROOT / "tests" / "fixtures" / "fox.glb"), "-o", str(out), "--webp", "--json")
+        self.assertNotEqual(proc.returncode, 0)
+
+    def test_info_detects_misconfigured_colorspace(self):
+        # misconfigured_colorspace.blend: Base Color tagged Non-Color (should be sRGB);
+        # Roughness and a normal map's own texture both tagged sRGB (should be Non-Color).
+        proc = run("info.py", str(ROOT / "tests" / "fixtures" / "misconfigured_colorspace.blend"), "--json")
+        self.assertEqual(proc.returncode, 0, proc.stderr)
+        data = json.loads(proc.stdout)
+        issues = {i["socket"]: i for i in data["materials"]["colorspace_issues"]}
+        self.assertEqual(set(issues), {"Base Color", "Roughness", "Normal"})
+        self.assertEqual(issues["Base Color"]["expected"], "sRGB")
+        self.assertEqual(issues["Base Color"]["colorspace"], "Non-Color")
+        self.assertEqual(issues["Roughness"]["expected"], "Non-Color")
+        self.assertEqual(issues["Normal"]["image"], "normal_tex")
+
+    def test_optimize_fix_colorspace_corrects_every_mismatch(self):
+        out = self.out / "colorspace_fixed.blend"
+        proc = run("optimize.py", str(ROOT / "tests" / "fixtures" / "misconfigured_colorspace.blend"), "-o", str(out), "--fix-colorspace", "--json")
+        self.assertEqual(proc.returncode, 0, proc.stderr)
+        data = json.loads(proc.stdout)
+        self.assertEqual(data["colorspace_fixed"], 3)
+
+        verify = json.loads(run("info.py", str(out), "--json").stdout)
+        self.assertEqual(verify["materials"]["colorspace_issues"], [])
+
+    def test_optimize_texture_colorspace_forces_every_image(self):
+        # ACEScg is a real colorspace in Blender's own bundled OCIO config (confirmed via its
+        # own enum) -- note this tags textures for an ACES-aware shading pipeline; Blender's
+        # stock config has no ACES *view transform* for rendering at all, a separate thing.
+        out = self.out / "aces.blend"
+        proc = run("optimize.py", str(ROOT / "tests" / "fixtures" / "misconfigured_colorspace.blend"), "-o", str(out), "--texture-colorspace", "ACEScg", "--json")
+        self.assertEqual(proc.returncode, 0, proc.stderr)
+        data = json.loads(proc.stdout)
+        self.assertEqual(set(data["texture_colorspace_changed"]), {"diffuse_tex", "rough_tex", "normal_tex"})
+
+    def test_optimize_texture_colorspace_rejects_unknown_name(self):
+        out = self.out / "bad.blend"
+        proc = run("optimize.py", str(ROOT / "tests" / "fixtures" / "misconfigured_colorspace.blend"), "-o", str(out), "--texture-colorspace", "NotARealColorspace", "--json")
+        self.assertNotEqual(proc.returncode, 0)
+
+    def test_optimize_rejects_fix_colorspace_with_texture_colorspace_together(self):
+        out = self.out / "conflict.blend"
+        proc = run("optimize.py", str(ROOT / "tests" / "fixtures" / "misconfigured_colorspace.blend"), "-o", str(out), "--fix-colorspace", "--texture-colorspace", "sRGB")
+        self.assertNotEqual(proc.returncode, 0)
+
+    def test_lod_default_ratios_match_info_pys_own_suggestions(self):
+        # box.glb: 12 triangles. Default ratios (0.5, 0.25, 0.1) match info.py's own LOD1/2/3
+        # suggestion ladder (RM-010) -- LOD0 is always an unmodified copy at full detail.
+        out_dir = self.out / "lod_default"
+        proc = run("lod.py", str(FIXTURE), "--out-dir", str(out_dir), "--json")
+        self.assertEqual(proc.returncode, 0, proc.stderr)
+        data = json.loads(proc.stdout)
+        self.assertEqual(data["triangles_original"], 12)
+        levels = {lvl["name"]: lvl for lvl in data["levels"]}
+        self.assertEqual(set(levels), {"LOD0", "LOD1", "LOD2", "LOD3"})
+        self.assertEqual(levels["LOD0"]["triangles_after"], 12)
+        self.assertLessEqual(levels["LOD1"]["triangles_after"], 12)
+        self.assertLessEqual(levels["LOD2"]["triangles_after"], levels["LOD1"]["triangles_after"])
+        self.assertLessEqual(levels["LOD3"]["triangles_after"], levels["LOD2"]["triangles_after"])
+        for lvl in data["levels"]:
+            self.assertTrue(Path(lvl["output"]).exists())
+
+    def test_lod_target_triangles_scales_lod1_and_halves_the_rest(self):
+        out_dir = self.out / "lod_target"
+        proc = run("lod.py", str(ROOT / "tests" / "fixtures" / "fox.glb"), "--out-dir", str(out_dir), "--target-triangles", "200", "--json")
+        self.assertEqual(proc.returncode, 0, proc.stderr)
+        data = json.loads(proc.stdout)
+        levels = {lvl["name"]: lvl for lvl in data["levels"]}
+        # ratio1 = 200 / triangles_original (576, the real "fox" mesh -- the synthesized
+        # bone-shape widget must not be counted, see references/pitfalls.md's RM-027 entry).
+        self.assertEqual(data["triangles_original"], 576)
+        self.assertAlmostEqual(levels["LOD1"]["ratio"], 200 / 576, places=4)
+        self.assertAlmostEqual(levels["LOD2"]["ratio"], levels["LOD1"]["ratio"] / 2, places=6)
+        self.assertAlmostEqual(levels["LOD3"]["ratio"], levels["LOD1"]["ratio"] / 4, places=6)
+
+    def test_lod_outputs_never_leak_the_synthesized_bone_shape_widget(self):
+        # fox.glb's synthetic "Icosphere" bone custom-shape widget (see references/pitfalls.md)
+        # must never appear in a LOD output's own mesh list -- confirmed real, not just a
+        # reporting artifact from Blender's own whole-scene export already excluding it.
+        out_dir = self.out / "lod_no_widget"
+        proc = run("lod.py", str(ROOT / "tests" / "fixtures" / "fox.glb"), "--out-dir", str(out_dir), "--json")
+        self.assertEqual(proc.returncode, 0, proc.stderr)
+        data = json.loads(proc.stdout)
+        import struct as _struct
+        for lvl in data["levels"]:
+            with open(lvl["output"], "rb") as f:
+                f.read(12)
+                chunk_len, _chunk_type = _struct.unpack("<II", f.read(8))
+                gltf = json.loads(f.read(chunk_len))
+            self.assertEqual([m["name"] for m in gltf.get("meshes", [])], ["fox1"])
+
+    def test_lod_rejects_malformed_ratios(self):
+        out_dir = self.out / "lod_bad_ratios"
+        proc = run("lod.py", str(FIXTURE), "--out-dir", str(out_dir), "--ratios", "0.6,0.3")
+        self.assertNotEqual(proc.returncode, 0)
+
+    def test_split_separates_independent_hierarchies(self):
+        # two_props.glb: PropA and PropB, two plain cubes with no parent relationship at all --
+        # each must become its own group.
+        out_dir = self.out / "split"
+        proc = run("split.py", str(ROOT / "tests" / "fixtures" / "two_props.glb"), "--out-dir", str(out_dir), "--json")
+        self.assertEqual(proc.returncode, 0, proc.stderr)
+        data = json.loads(proc.stdout)
+        groups = {g["root_object"]: g for g in data["groups"]}
+        self.assertEqual(set(groups), {"PropA", "PropB"})
+        self.assertEqual(groups["PropA"]["objects"], ["PropA"])
+        self.assertEqual(groups["PropB"]["objects"], ["PropB"])
+        for g in data["groups"]:
+            self.assertGreater(Path(g["output"]).stat().st_size, 1000)  # not the empty-export symptom (132 bytes)
+
+    def test_split_keeps_a_skinned_mesh_with_its_armature_as_one_group(self):
+        # fox.glb: "fox" (mesh) is parented to "root" (armature) via both Object parenting and
+        # an Armature modifier -- must stay one single group, not two. Blender's own glTF
+        # importer additionally synthesizes a small "Icosphere" mesh object on import (a shared
+        # bone custom-shape display widget for every pose bone, confirmed absent from fox.glb's
+        # own JSON -- see references/pitfalls.md); split.py must not misidentify that as its own
+        # independent hierarchy and export it as a spurious file.
+        out_dir = self.out / "split"
+        proc = run("split.py", str(ROOT / "tests" / "fixtures" / "fox.glb"), "--out-dir", str(out_dir), "--json")
+        self.assertEqual(proc.returncode, 0, proc.stderr)
+        data = json.loads(proc.stdout)
+        self.assertEqual(len(data["groups"]), 1)
+        group = data["groups"][0]
+        self.assertEqual(group["root_object"], "root")
+        self.assertEqual(set(group["objects"]), {"root", "fox"})
+        self.assertNotIn("Icosphere", group["objects"])
+
+        root_info = json.loads(run("info.py", str(group["output"]), "--json").stdout)
+        self.assertEqual(len(root_info["armatures"]), 1)
+        self.assertEqual(root_info["armatures"][0]["bone_count"], 24)
+        self.assertEqual(len(root_info["animations"]), 3)  # Run_root, Survey_root, Walk_root all kept
+
+    def test_split_rejects_blend_output_format(self):
+        out_dir = self.out / "split_blend"
+        proc = run("split.py", str(ROOT / "tests" / "fixtures" / "two_props.glb"), "--out-dir", str(out_dir), "--format", "blend", "--json")
+        self.assertNotEqual(proc.returncode, 0)
+
+    def test_anim_extract_keeps_only_the_armature_and_every_action(self):
+        out = self.out / "fox_anim_only.glb"
+        proc = run("anim.py", str(ROOT / "tests" / "fixtures" / "fox.glb"), "--extract", "-o", str(out), "--json")
+        self.assertEqual(proc.returncode, 0, proc.stderr)
+        data = json.loads(proc.stdout)
+        self.assertEqual(set(data["actions"]), {"Run_root", "Survey_root", "Walk_root"})
+        self.assertEqual(data["armatures_kept"], ["root"])
+
+        import struct as _struct
+        with open(out, "rb") as f:
+            f.read(12)
+            chunk_len, _chunk_type = _struct.unpack("<II", f.read(8))
+            gltf = json.loads(f.read(chunk_len))
+        self.assertEqual(gltf.get("meshes", []), [])  # mesh-free -- animation only, as documented
+
+        info = json.loads(run("info.py", str(out), "--json").stdout)
+        self.assertEqual(len(info["armatures"]), 1)
+        self.assertEqual(len(info["animations"]), 3)
+
+    def test_anim_extract_action_filter_keeps_only_the_named_action(self):
+        out = self.out / "fox_walk_only.glb"
+        proc = run("anim.py", str(ROOT / "tests" / "fixtures" / "fox.glb"), "--extract", "--action", "Walk_root", "-o", str(out), "--json")
+        self.assertEqual(proc.returncode, 0, proc.stderr)
+        data = json.loads(proc.stdout)
+        self.assertEqual(data["actions"], ["Walk_root"])
+        info = json.loads(run("info.py", str(out), "--json").stdout)
+        self.assertEqual([a["name"] for a in info["animations"]], ["Walk_root"])
+
+    def test_anim_combine_merges_separate_files_without_leaking_extra_objects(self):
+        # A Mixamo-style workflow: a rigged character (here, fox.glb itself, already carrying 3
+        # actions) combined with 2 more animation-only files (each produced exactly as anim.py
+        # --extract would) sharing the same bone names.
+        run_only = self.out / "run_only.glb"
+        survey_only = self.out / "survey_only.glb"
+        for action, out in (("Run_root", run_only), ("Survey_root", survey_only)):
+            proc = run("anim.py", str(ROOT / "tests" / "fixtures" / "fox.glb"), "--extract", "--action", action, "-o", str(out))
+            self.assertEqual(proc.returncode, 0, proc.stderr)
+
+        combined = self.out / "combined.glb"
+        proc = run("anim.py", str(ROOT / "tests" / "fixtures" / "fox.glb"), "--combine", str(run_only), str(survey_only), "-o", str(combined), "--json")
+        self.assertEqual(proc.returncode, 0, proc.stderr)
+        data = json.loads(proc.stdout)
+        self.assertEqual(len(data["combined"]), 2)
+
+        # The real regression this guards: Blender's own synthesized bone-shape widget from the
+        # *base* file's import must not leak into the combined output as a spurious extra mesh
+        # (each anim source's own copy is already discarded by the new-object diff regardless).
+        import struct as _struct
+        with open(combined, "rb") as f:
+            f.read(12)
+            chunk_len, _chunk_type = _struct.unpack("<II", f.read(8))
+            gltf = json.loads(f.read(chunk_len))
+        self.assertEqual([m["name"] for m in gltf.get("meshes", [])], ["fox1"])
+        self.assertEqual(len(gltf.get("animations", [])), 5)  # base's 3 + the 2 combined
+
+    def test_anim_combine_rejects_unsupported_output_format(self):
+        out = self.out / "combined.obj"
+        proc = run(
+            "anim.py", str(ROOT / "tests" / "fixtures" / "fox.glb"),
+            "--combine", str(ROOT / "tests" / "fixtures" / "fox.glb"),
+            "-o", str(out), "--json",
+        )
+        self.assertNotEqual(proc.returncode, 0)
+
+    def test_convert_up_axis_reorients_the_output_geometry(self):
+        # tall_cube.blend: a cube at Blender-native location (0, 0, 5) -- native format, so no
+        # importer axis-convention ambiguity to confound the check (unlike OBJ, whose own
+        # default import/export axes are its traditional Y-up/-Z-forward convention, not
+        # Blender's; see references/pitfalls.md). Default glTF export (up=Y) must move that
+        # world position into the Y column; --up-axis Z must keep it in the Z column.
+        fixture = ROOT / "tests" / "fixtures" / "tall_cube.blend"
+        default_out = self.out / "default_up.glb"
+        proc = run("convert.py", str(fixture), "-o", str(default_out), "--json")
+        self.assertEqual(proc.returncode, 0, proc.stderr)
+        z_out = self.out / "z_up.glb"
+        proc = run("convert.py", str(fixture), "-o", str(z_out), "--up-axis", "Z", "--json")
+        self.assertEqual(proc.returncode, 0, proc.stderr)
+
+        import struct as _struct
+
+        def node_translation(path):
+            with open(path, "rb") as f:
+                f.read(12)
+                chunk_len, _chunk_type = _struct.unpack("<II", f.read(8))
+                gltf = json.loads(f.read(chunk_len))
+            return gltf["nodes"][0]["translation"]
+
+        self.assertEqual(node_translation(default_out), [0, 5, 0])  # glTF's mandatory Y-up
+        self.assertEqual(node_translation(z_out), [0, 0, 5])  # Blender's own native Z-up, kept
+
+    def test_convert_up_axis_rejects_unsupported_format_and_axis_combinations(self):
+        fixture = ROOT / "tests" / "fixtures" / "tall_cube.blend"
+        # ABC/.blend have no axis-orientation control in Blender at all.
+        proc = run("convert.py", str(fixture), "-o", str(self.out / "x.abc"), "--up-axis", "Z", "--json")
+        self.assertNotEqual(proc.returncode, 0)
+        # glTF has no forward-axis control, and only accepts up-axis Y or Z (its spec is fixed Y-up).
+        proc = run("convert.py", str(fixture), "-o", str(self.out / "x.glb"), "--forward-axis", "X", "--json")
+        self.assertNotEqual(proc.returncode, 0)
+        proc = run("convert.py", str(fixture), "-o", str(self.out / "x2.glb"), "--up-axis", "X", "--json")
+        self.assertNotEqual(proc.returncode, 0)
+
+    def test_convert_up_axis_applies_to_usd_via_a_root_transform(self):
+        # USD needs convert_orientation=True as a master switch alongside its own up/forward
+        # selection (confirmed: without it, the selection is accepted but has no effect) --
+        # applied as a single root Xform wrapper's rotation, not per-object; verified directly
+        # against the exported file's own raw text (upAxis stage metadata + a rotateXYZ on the
+        # root prim), not through Blender's own reimport.
+        fixture = ROOT / "tests" / "fixtures" / "tall_cube.blend"
+        out = self.out / "axis.usda"
+        proc = run("convert.py", str(fixture), "-o", str(out), "--up-axis", "Z", "--json")
+        self.assertEqual(proc.returncode, 0, proc.stderr)
+        content = out.read_text()
+        self.assertIn('upAxis = "Z"', content)
+        self.assertIn("xformOp:rotateXYZ", content)
+
+    def test_convert_and_verify_roundtrip(self):
+        # fbx keeps the same shared-vertex topology as glb, so this roundtrip should match
+        # exactly. STL has no index buffer at all (every triangle stores 3 independent
+        # vertices) -- a glb -> stl -> glb roundtrip legitimately changes the vertex count
+        # (24 -> 36 for this cube) and is not a bug; see references/pitfalls.md.
+        out = self.out / "box.fbx"
+        proc = run("convert.py", str(FIXTURE), "-o", str(out), "--verify", "--json")
+        self.assertEqual(proc.returncode, 0, proc.stderr)
+        self.assertTrue(out.exists())
+        data = json.loads(proc.stdout)
+        self.assertTrue(data["verify"]["matches"], data["verify"]["diffs"])
+
+    def test_optimize_texture_auto_resolution_scales_by_scene_relative_size(self):
+        # scene_scale_mix.blend: a 10-unit "BigProp" and a 1-unit "SmallProp" 20 units apart,
+        # each with its own 512x512 texture. The small object's texture should get a much
+        # smaller computed cap than the big one's -- a real, data-driven "screen occupancy"
+        # proxy (each object's own bounding-box diagonal vs. the whole scene's combined one),
+        # not just one flat number every texture in the file would share under --texture-max.
+        out = self.out / "auto_res.glb"
+        proc = run("optimize.py", str(ROOT / "tests" / "fixtures" / "scene_scale_mix.blend"), "-o", str(out), "--texture-auto-resolution", "--json")
+        self.assertEqual(proc.returncode, 0, proc.stderr)
+        data = json.loads(proc.stdout)
+        caps = data["texture_auto_caps"]
+        self.assertEqual(set(caps), {"big_tex", "small_tex"})
+        self.assertGreater(caps["big_tex"], caps["small_tex"])
+        # Only small_tex actually needed downscaling from its original 512x512 (big_tex's
+        # computed cap is above 512, so it's correctly left untouched).
+        resized = {r["name"]: r for r in data["textures_resized"]}
+        self.assertEqual(set(resized), {"small_tex"})
+        self.assertEqual(resized["small_tex"]["to"], [caps["small_tex"]] * 2)
+
+    def test_optimize_texture_auto_resolution_single_object_gets_full_viewport_cap(self):
+        # fox.glb (after stripping Blender's own synthesized bone-shape widget -- see
+        # references/pitfalls.md) has exactly one real mesh object, so its own bounding box IS
+        # the whole scene's: fraction 1.0, cap = next power of two >= --viewport-width.
+        out = self.out / "auto_res_single.glb"
+        proc = run("optimize.py", str(ROOT / "tests" / "fixtures" / "fox.glb"), "-o", str(out), "--texture-auto-resolution", "--viewport-width", "1000", "--json")
+        self.assertEqual(proc.returncode, 0, proc.stderr)
+        data = json.loads(proc.stdout)
+        self.assertEqual(data["texture_auto_caps"], {"Image_0": 1024})  # next_pow2(1000)
+
+    def test_optimize_rejects_texture_max_with_texture_auto_resolution_together(self):
+        out = self.out / "conflict.glb"
+        proc = run("optimize.py", str(FIXTURE), "-o", str(out), "--texture-max", "512", "--texture-auto-resolution")
+        self.assertNotEqual(proc.returncode, 0)
+
+    def test_optimize_triangle_counts_exclude_the_synthesized_bone_shape_widget(self):
+        # The same fix split.py/anim.py/lod.py already needed (see references/pitfalls.md):
+        # fox.glb's real mesh has 576 triangles; before this fix, optimize.py's own
+        # triangles_before/after were inflated to 656 by Blender's synthesized bone-shape widget.
+        out = self.out / "fox_opt.glb"
+        proc = run("optimize.py", str(ROOT / "tests" / "fixtures" / "fox.glb"), "-o", str(out), "--json")
+        self.assertEqual(proc.returncode, 0, proc.stderr)
+        data = json.loads(proc.stdout)
+        self.assertEqual(data["triangles_before"], 576)
+        self.assertEqual(data["triangles_after"], 576)
+
+    def test_optimize_remove_unused_bones_prunes_only_genuinely_dead_leaves(self):
+        # sparse_rig.blend: Root -> Spine -> Head -> HeadTip (no weight, no animation -- dead)
+        #                              Spine -> Arm1 -> Arm1Tip (dead)
+        #                              Spine -> Arm2 (weight 0.2)
+        #                              Spine -> Arm3 (weight 0.05)
+        # Only HeadTip/Arm1Tip have zero skin-weight influence and no animation -- everything
+        # else (including the barely-weighted Arm2/Arm3) must survive untouched.
+        out = self.out / "pruned.glb"
+        proc = run("optimize.py", str(ROOT / "tests" / "fixtures" / "sparse_rig.blend"), "-o", str(out), "--remove-unused-bones", "--json")
+        self.assertEqual(proc.returncode, 0, proc.stderr)
+        data = json.loads(proc.stdout)
+        self.assertEqual(set(data["bones_removed"]), {"HeadTip", "Arm1Tip"})
+        self.assertEqual(data["bones_demoted"], [])
+
+        info = json.loads(run("info.py", str(out), "--json").stdout)
+        self.assertEqual(set(b["name"] for b in info["armatures"][0]["bones"]), {"Root", "Spine", "Head", "Arm1", "Arm2", "Arm3"})
+
+    def test_optimize_max_bones_removes_lowest_influence_first_and_transfers_weight(self):
+        out = self.out / "capped.glb"
+        proc = run("optimize.py", str(ROOT / "tests" / "fixtures" / "sparse_rig.blend"), "-o", str(out), "--max-bones", "4", "--json")
+        self.assertEqual(proc.returncode, 0, proc.stderr)
+        data = json.loads(proc.stdout)
+        # Lowest-influence-first order: the two genuinely dead bones, then Arm3 (0.05), then
+        # Arm2 (0.2) -- never touching the more-weighted Root/Spine/Head/Arm1.
+        self.assertEqual(
+            [d["bone"] for d in data["bones_demoted"]],
+            ["HeadTip", "Arm1Tip", "Arm3", "Arm2"],
+        )
+        self.assertEqual(data["bones_demoted"][2]["reassigned_to"], "Spine")
+        self.assertEqual(data["bones_demoted"][3]["reassigned_to"], "Spine")
+
+        info = json.loads(run("info.py", str(out), "--json").stdout)
+        self.assertEqual(set(b["name"] for b in info["armatures"][0]["bones"]), {"Root", "Spine", "Head", "Arm1"})
+
+    def test_optimize_max_bones_never_removes_an_animated_bone(self):
+        # sparse_rig_animated_arm3.blend: same rig, but Arm3 (the lowest-weight bone) now has a
+        # real keyframed location animation -- it must survive even though every other candidate
+        # outranks it by weight, and the tool must say so rather than silently forcing the count.
+        out = self.out / "capped_anim.glb"
+        proc = run("optimize.py", str(ROOT / "tests" / "fixtures" / "sparse_rig_animated_arm3.blend"), "-o", str(out), "--max-bones", "2", "--json")
+        self.assertEqual(proc.returncode, 0, proc.stderr)
+        data = json.loads(proc.stdout)
+        self.assertEqual(len(data["warnings"]), 1)
+        self.assertIn("animated bone", data["warnings"][0])
+
+        info = json.loads(run("info.py", str(out), "--json").stdout)
+        remaining = {b["name"] for b in info["armatures"][0]["bones"]}
+        self.assertIn("Arm3", remaining)
+        self.assertEqual(len(remaining), 3)  # couldn't reach 2, stopped at 3
+
+    def test_optimize_max_bones_never_drops_a_weighted_root_bones_own_weight(self):
+        # root_leaf_rig.blend: RootA is a root bone (no parent) with no children of its own --
+        # a "leaf" by the pruning definition -- and carries real skin weight (the whole mesh).
+        # RootB -> AnimKid is a separate chain where AnimKid is animated. With every other
+        # candidate excluded (RootB isn't a leaf, AnimKid is animated), a naive cap would pick
+        # RootA as the only remaining "leaf" and discard its weight since there's no parent to
+        # transfer it to (reassigned_to would be null). It must instead stop and warn, exactly
+        # as it already does for an animated bone, never dropping RootA or its weight.
+        out = self.out / "root_leaf_capped.glb"
+        proc = run("optimize.py", str(ROOT / "tests" / "fixtures" / "root_leaf_rig.blend"), "-o", str(out), "--max-bones", "1", "--json")
+        self.assertEqual(proc.returncode, 0, proc.stderr)
+        data = json.loads(proc.stdout)
+        self.assertEqual(data["bones_demoted"], [])
+        self.assertEqual(len(data["warnings"]), 1)
+        self.assertIn("weighted root bone", data["warnings"][0])
+
+        info = json.loads(run("info.py", str(out), "--json").stdout)
+        self.assertEqual(set(b["name"] for b in info["armatures"][0]["bones"]), {"RootA", "RootB", "AnimKid"})
+
+    def test_optimize_rejects_non_positive_max_bones(self):
+        out = self.out / "bad.glb"
+        proc = run("optimize.py", str(ROOT / "tests" / "fixtures" / "sparse_rig.blend"), "-o", str(out), "--max-bones", "0", "--json")
+        self.assertNotEqual(proc.returncode, 0)
+
+    def test_optimize_keyframe_decimate_matches_hand_computed_rdp_result(self):
+        # keyframe_curve.blend: a single location.x fcurve with 7 keyframes:
+        #   (0,0.0) (5,0.5) (10,1.0) (15,3.0) (20,1.0) (25,1.0) (30,1.0)
+        # Worked out by hand (see references/pitfalls.md): at tolerance 0.1, RDP keeps
+        # frames 0, 10, 15, 20, 30 and drops 5 (exactly on the 0->10 line) and 25 (exactly on
+        # the flat 20->30 line) -- 7 -> 5 keyframes.
+        out = self.out / "curve_decimated.blend"
+        proc = run("optimize.py", str(ROOT / "tests" / "fixtures" / "keyframe_curve.blend"), "-o", str(out), "--keyframe-decimate", "0.1", "--json")
+        self.assertEqual(proc.returncode, 0, proc.stderr)
+        data = json.loads(proc.stdout)
+        self.assertEqual(data["keyframe_points_before"], 7)
+        self.assertEqual(data["keyframe_points_after"], 5)
+        self.assertEqual(data["keyframes_decimated_by_action"], [{"action": "CurveTest", "keyframe_points_before": 7, "keyframe_points_after": 5}])
+
+    def test_optimize_keyframe_decimate_large_tolerance_keeps_only_endpoints(self):
+        out = self.out / "curve_hightol.blend"
+        proc = run("optimize.py", str(ROOT / "tests" / "fixtures" / "keyframe_curve.blend"), "-o", str(out), "--keyframe-decimate", "10", "--json")
+        self.assertEqual(proc.returncode, 0, proc.stderr)
+        data = json.loads(proc.stdout)
+        self.assertEqual(data["keyframe_points_after"], 2)  # first/last always survive
+
+    def test_optimize_keyframe_decimate_preserves_animation_bounds_on_a_real_character(self):
+        # fox.glb has three real animations (Run/Survey/Walk) with distinct frame ranges --
+        # decimating must shrink keyframe count without moving any action's start/end frame,
+        # since the first/last keyframe of every fcurve is always protected. Compared against a
+        # plain optimize.py pass-through (no --keyframe-decimate) on the same file, not against
+        # the original fox.glb directly: optimize.py's own default (non-multi-action) glTF
+        # export already truncates Run's fractional last frame (27.8 -> 27.0) with no decimation
+        # involved at all -- a pre-existing export quirk (see references/pitfalls.md), not
+        # something this feature should be blamed for or is expected to preserve.
+        passthrough_out = self.out / "fox_passthrough.glb"
+        proc0 = run("optimize.py", str(ROOT / "tests" / "fixtures" / "fox.glb"), "-o", str(passthrough_out), "--json")
+        self.assertEqual(proc0.returncode, 0, proc0.stderr)
+        before_info = json.loads(run("info.py", str(passthrough_out), "--json").stdout)
+
+        out = self.out / "fox_decimated.glb"
+        proc = run("optimize.py", str(ROOT / "tests" / "fixtures" / "fox.glb"), "-o", str(out), "--keyframe-decimate", "0.01", "--json")
+        self.assertEqual(proc.returncode, 0, proc.stderr)
+        data = json.loads(proc.stdout)
+        self.assertLess(data["keyframe_points_after"], data["keyframe_points_before"])
+
+        after_info = json.loads(run("info.py", str(out), "--json").stdout)
+        before_by_name = {a["name"]: a for a in before_info["animations"]}
+        after_by_name = {a["name"]: a for a in after_info["animations"]}
+        self.assertEqual(set(before_by_name), set(after_by_name))
+        for name, before_anim in before_by_name.items():
+            after_anim = after_by_name[name]
+            self.assertEqual(before_anim["frame_start"], after_anim["frame_start"])
+            self.assertEqual(before_anim["frame_end"], after_anim["frame_end"])
+
+    def test_optimize_rejects_non_positive_keyframe_decimate(self):
+        out = self.out / "bad_kf.blend"
+        proc = run("optimize.py", str(ROOT / "tests" / "fixtures" / "keyframe_curve.blend"), "-o", str(out), "--keyframe-decimate", "0", "--json")
+        self.assertNotEqual(proc.returncode, 0)
+
+    def test_optimize_rejects_nan_keyframe_decimate(self):
+        # A straight `<= 0` check lets NaN through (`nan <= 0` is False) -- caught by review.
+        out = self.out / "bad_kf_nan.blend"
+        proc = run("optimize.py", str(ROOT / "tests" / "fixtures" / "keyframe_curve.blend"), "-o", str(out), "--keyframe-decimate", "nan", "--json")
+        self.assertNotEqual(proc.returncode, 0)
+
+    def test_optimize_keyframe_decimate_never_exceeds_tolerance_on_a_constant_curve(self):
+        # constant_curve.blend: (0,0.0) (5,1.0) (10,1.0), CONSTANT interpolation throughout.
+        # A straight-line error estimate at frame 5 is |1.0-0.5|=0.5 -- under tolerance 0.75, so
+        # a version that assumed linear interpolation would wrongly remove it. The real
+        # CONSTANT-governed curve holds 0.0 from frame 0 to 10, so the true error is |1.0-0.0|=
+        # 1.0 -- frame 5 must survive at any tolerance below 1.0 (caught by review; see
+        # references/pitfalls.md for the full worked example).
+        out = self.out / "const_low_tol.blend"
+        proc = run("optimize.py", str(ROOT / "tests" / "fixtures" / "constant_curve.blend"), "-o", str(out), "--keyframe-decimate", "0.75", "--json")
+        self.assertEqual(proc.returncode, 0, proc.stderr)
+        data = json.loads(proc.stdout)
+        self.assertEqual(data["keyframe_points_after"], 3)  # frame 5 protected, nothing removed
+
+    def test_optimize_keyframe_decimate_removes_a_constant_keyframe_once_true_error_fits(self):
+        # Same curve, but tolerance 1.5 is above the *real* CONSTANT error (1.0) -- frame 5 is
+        # correctly removed once the exact (not straight-line) error is what's being measured.
+        out = self.out / "const_high_tol.blend"
+        proc = run("optimize.py", str(ROOT / "tests" / "fixtures" / "constant_curve.blend"), "-o", str(out), "--keyframe-decimate", "1.5", "--json")
+        self.assertEqual(proc.returncode, 0, proc.stderr)
+        data = json.loads(proc.stdout)
+        self.assertEqual(data["keyframe_points_after"], 2)
+
+    def test_optimize_remove_unused_shape_keys_resolves_a_dead_chain(self):
+        # shape_key_rig.blend: Basis, Real1 (real displacement from Basis), Dead1 (zero
+        # displacement from Basis), Dead2 (relative to Dead1, itself zero displacement), Real2
+        # (relative to Dead2, real displacement). Only Dead1/Dead2 are geometrically no-ops --
+        # Real1/Real2 must survive. Dead2's own max-displacement check only succeeds (rather than
+        # crashing on a dangling relative_key, or misreporting since Dead1's removal already
+        # happened by the time Dead2 is checked) if Blender's own auto-splice -- re-pointing
+        # Dead2 onto Dead1's own relative_key (Basis) the moment Dead1 is removed, verified
+        # directly against real Blender while building this feature -- actually took effect.
+        out = self.out / "shapekey_out.blend"
+        proc = run("optimize.py", str(ROOT / "tests" / "fixtures" / "shape_key_rig.blend"), "-o", str(out), "--remove-unused-shape-keys", "--json")
+        self.assertEqual(proc.returncode, 0, proc.stderr)
+        data = json.loads(proc.stdout)
+        self.assertEqual(
+            sorted(s["shape_key"] for s in data["shape_keys_removed"]),
+            ["Dead1", "Dead2"],
+        )
+        for s in data["shape_keys_removed"]:
+            self.assertEqual(s["max_displacement"], 0.0)
+
+        # A second pass over the already-cleaned output must find nothing left to remove.
+        out2 = self.out / "shapekey_out2.blend"
+        proc2 = run("optimize.py", str(out), "-o", str(out2), "--remove-unused-shape-keys", "--json")
+        self.assertEqual(proc2.returncode, 0, proc2.stderr)
+        self.assertEqual(json.loads(proc2.stdout)["shape_keys_removed"], [])
+
+    def test_optimize_remove_unused_shape_keys_skips_absolute_mode_sequences(self):
+        # absolute_shape_key_rig.blend: Key.use_relative = False (a timed sequence, not a
+        # relative blend). StateA is geometrically identical to Basis (zero displacement from
+        # relative_key) but is still a real waypoint in the Absolute-mode sequence between Basis
+        # and StateB -- removing it would change how Blender interpolates between surviving
+        # states. Must never be touched (caught by review; see references/pitfalls.md).
+        out = self.out / "abs_out.blend"
+        proc = run("optimize.py", str(ROOT / "tests" / "fixtures" / "absolute_shape_key_rig.blend"), "-o", str(out), "--remove-unused-shape-keys", "--json")
+        self.assertEqual(proc.returncode, 0, proc.stderr)
+        data = json.loads(proc.stdout)
+        self.assertEqual(data["shape_keys_removed"], [])
+
+    def test_optimize_instance_duplicate_meshes_merges_only_truly_identical_copies(self):
+        # instancing_rig.blend: CubeA1/A2/A3 are three separate-datablock but fully identical
+        # cube copies -- must merge onto one shared datablock. CubeB1/B2 share the same
+        # vertex/triangle/area/volume/bbox signature info.py's own loose duplicate_mesh_candidates
+        # heuristic would flag, but B2's UVs are shifted -- must NOT merge (proving this check is
+        # stricter than that suggestion-only fingerprint). CubeC1/C2 are geometrically identical
+        # but have shape keys -- must NOT merge (shared mesh data means shared shape-key state in
+        # Blender's own data model). Sphere has no duplicate at all.
+        out = self.out / "instanced_out.blend"
+        proc = run("optimize.py", str(ROOT / "tests" / "fixtures" / "instancing_rig.blend"), "-o", str(out), "--instance-duplicate-meshes", "--json")
+        self.assertEqual(proc.returncode, 0, proc.stderr)
+        data = json.loads(proc.stdout)
+        self.assertEqual(len(data["meshes_instanced"]), 1)
+        group = data["meshes_instanced"][0]
+        self.assertEqual(group["canonical_objects"], ["CubeA1"])
+        self.assertEqual(sorted(group["merged_objects"]), ["CubeA2", "CubeA3"])
+        self.assertEqual(len(group["datablocks_removed"]), 2)
+
+        info = json.loads(run("info.py", str(out), "--json").stdout)
+        already_instanced = info["instancing"]["already_instanced"]
+        self.assertEqual(len(already_instanced), 1)
+        self.assertEqual(sorted(already_instanced[0]["objects"]), ["CubeA1", "CubeA2", "CubeA3"])
+        # B (different UVs) and C (shape-keyed) still show up as separate-datablock candidates
+        # by info.py's own loose signature -- proving they were never merged.
+        candidates = info["instancing"]["duplicate_mesh_candidates"][0]["objects"]
+        for name in ("CubeB1", "CubeB2", "CubeC1", "CubeC2"):
+            self.assertIn(name, candidates)
+
+    def test_optimize_instance_duplicate_meshes_checks_material_index_and_smoothing(self):
+        # material_index_rig.blend: MatIdxA/B share the same two materials in the same slot
+        # order and identical geometry, but one face's material_index differs -- must not merge.
+        # SmoothA/B are identical except one face's use_smooth -- must not merge either. Caught
+        # by review; see references/pitfalls.md.
+        out = self.out / "matidx_out.blend"
+        proc = run("optimize.py", str(ROOT / "tests" / "fixtures" / "material_index_rig.blend"), "-o", str(out), "--instance-duplicate-meshes", "--json")
+        self.assertEqual(proc.returncode, 0, proc.stderr)
+        data = json.loads(proc.stdout)
+        self.assertEqual(data["meshes_instanced"], [])
+
+    def test_optimize_instance_duplicate_meshes_checks_sharp_faces_and_layer_names(self):
+        # sharp_uvname_rig.blend: SharpA/B are identical except one face is marked sharp on B;
+        # UVNameA/B have identical UV coordinates under different layer names; ColNameA/B have
+        # identical color-attribute values under different names. A shared material's node tree
+        # can look up a UV/color layer by name, so none of these three pairs may merge. Caught by
+        # review; see references/pitfalls.md.
+        out = self.out / "sharp_uvname_out.blend"
+        proc = run("optimize.py", str(ROOT / "tests" / "fixtures" / "sharp_uvname_rig.blend"), "-o", str(out), "--instance-duplicate-meshes", "--json")
+        self.assertEqual(proc.returncode, 0, proc.stderr)
+        data = json.loads(proc.stdout)
+        self.assertEqual(data["meshes_instanced"], [])
+
+    def test_optimize_instance_duplicate_meshes_never_touches_a_datablock_an_animatable_object_still_uses(self):
+        # shared_data_rig.blend: SharedA and SharedB point at the SAME mesh datablock; SharedB
+        # has an Armature modifier, SharedA doesn't. Other is a separate, geometrically-identical
+        # cube on its own datablock. Filtering *objects* by animatability before grouping by
+        # datablock (the first version of this feature) would still route SharedA into a merge
+        # group and free the shared datablock while SharedB silently still pointed at it -- a
+        # real crash, confirmed by reverting just this fix (StructRNA of type Object has been
+        # removed). The whole datablock must be excluded whenever any of its users is
+        # animatable, so nothing here should merge at all.
+        out = self.out / "shared_data_out.blend"
+        proc = run("optimize.py", str(ROOT / "tests" / "fixtures" / "shared_data_rig.blend"), "-o", str(out), "--instance-duplicate-meshes", "--json")
+        self.assertEqual(proc.returncode, 0, proc.stderr)
+        data = json.loads(proc.stdout)
+        self.assertEqual(data["meshes_instanced"], [])
+
+    def test_optimize_merge_materials_merges_identical_node_graphs_only(self):
+        # materials_rig.blend: MatA/MatB/MatC are three independently-authored materials with
+        # byte-identical node graphs -- must merge onto one canonical datablock. MatD has the
+        # same graph shape but a different Base Color -- must not merge. MuteMatA is identical
+        # to the trio (so it merges too) but MuteMatB has its Principled BSDF muted, which
+        # changes what the graph actually renders -- must not merge with anything. NoNodesMatA/B
+        # (use_nodes=False, identical legacy diffuse_color) must merge; NoNodesMatC (different
+        # diffuse_color) must not.
+        out = self.out / "materials_out.blend"
+        proc = run("optimize.py", str(ROOT / "tests" / "fixtures" / "materials_rig.blend"), "-o", str(out), "--merge-materials", "--json")
+        self.assertEqual(proc.returncode, 0, proc.stderr)
+        data = json.loads(proc.stdout)
+        self.assertEqual(len(data["materials_merged"]), 2)
+        by_canonical = {g["canonical_material"]: sorted(g["merged_materials"]) for g in data["materials_merged"]}
+        self.assertEqual(by_canonical["MatA"], ["MatB", "MatC", "MuteMatA"])
+        self.assertEqual(by_canonical["NoNodesMatA"], ["NoNodesMatB"])
+
+        info = json.loads(run("info.py", str(out), "--json").stdout)
+        self.assertEqual(set(info["materials"]["names"]), {"MatA", "MatD", "MuteMatB", "NoNodesMatA", "NoNodesMatC"})
+
+    def test_optimize_merge_materials_checks_image_datablock_identity_not_pixel_content(self):
+        # material_texture_rig.blend: TexMatA/TexMatB reference the exact same Image datablock
+        # via an Image Texture node -- must merge. TexMatC references a separately-created Image
+        # datablock with matching generation parameters (same pixel content, different identity)
+        # -- must not merge with A/B, since a merge here would make TexMatC's own object start
+        # sampling a texture it never actually referenced.
+        out = self.out / "material_texture_out.blend"
+        proc = run("optimize.py", str(ROOT / "tests" / "fixtures" / "material_texture_rig.blend"), "-o", str(out), "--merge-materials", "--json")
+        self.assertEqual(proc.returncode, 0, proc.stderr)
+        data = json.loads(proc.stdout)
+        self.assertEqual(len(data["materials_merged"]), 1)
+        self.assertEqual(data["materials_merged"][0]["canonical_material"], "TexMatA")
+        self.assertEqual(data["materials_merged"][0]["merged_materials"], ["TexMatB"])
+
+    def test_optimize_merge_materials_reassigns_per_object_slot_overrides(self):
+        # material_objlink_rig.blend: ObjLinkA_obj/ObjLinkB_obj each carry a per-OBJECT material
+        # slot override (link == 'OBJECT') rather than the mesh data's own slot material, pointing
+        # at two independently-authored but structurally-identical materials. Reassigning only
+        # mesh.materials (as RM-037's own instancing does for mesh data) would miss this case
+        # entirely -- object.material_slots needs its own reassignment pass.
+        out = self.out / "material_objlink_out.blend"
+        proc = run("optimize.py", str(ROOT / "tests" / "fixtures" / "material_objlink_rig.blend"), "-o", str(out), "--merge-materials", "--json")
+        self.assertEqual(proc.returncode, 0, proc.stderr)
+        data = json.loads(proc.stdout)
+        self.assertEqual(len(data["materials_merged"]), 1)
+        self.assertEqual(data["materials_merged"][0]["canonical_material"], "ObjLinkMatA")
+        self.assertEqual(data["materials_merged"][0]["merged_materials"], ["ObjLinkMatB"])
+
+        info = json.loads(run("info.py", str(out), "--json").stdout)
+        self.assertNotIn("ObjLinkMatB", info["materials"]["names"])
+
+    def test_optimize_merge_materials_reassigns_a_curve_objects_own_material_slot(self):
+        # material_curve_rig.blend: MeshObj (a mesh) and CurveObj (a Curve, not a Mesh) use two
+        # independently-authored but structurally-identical materials. A reassignment pass that
+        # only walked bpy.data.meshes (this feature's first version) would never touch
+        # CurveObj.data.materials -- Curve.materials is a real, separate material-slot list
+        # Blender gives every Curve/Text/MetaBall/GreasePencil/Volume datablock, not just Mesh --
+        # so bpy.data.materials.remove(dup) would have silently dropped the curve's material
+        # slot to None instead of reassigning it. Caught by review.
+        out = self.out / "material_curve_out.blend"
+        proc = run("optimize.py", str(ROOT / "tests" / "fixtures" / "material_curve_rig.blend"), "-o", str(out), "--merge-materials", "--json")
+        self.assertEqual(proc.returncode, 0, proc.stderr)
+        data = json.loads(proc.stdout)
+        self.assertEqual(len(data["materials_merged"]), 1)
+        canonical = data["materials_merged"][0]["canonical_material"]
+
+        info = json.loads(run("info.py", str(out), "--json").stdout)
+        self.assertEqual(info["materials"]["names"], [canonical])
+
+    def test_optimize_merge_materials_is_idempotent(self):
+        out1 = self.out / "materials_pass1.blend"
+        proc1 = run("optimize.py", str(ROOT / "tests" / "fixtures" / "materials_rig.blend"), "-o", str(out1), "--merge-materials", "--json")
+        self.assertEqual(proc1.returncode, 0, proc1.stderr)
+        out2 = self.out / "materials_pass2.blend"
+        proc2 = run("optimize.py", str(out1), "-o", str(out2), "--merge-materials", "--json")
+        self.assertEqual(proc2.returncode, 0, proc2.stderr)
+        self.assertEqual(json.loads(proc2.stdout)["materials_merged"], [])
+
+    def test_optimize_clean_mesh_removes_orphan_vertices_and_degenerate_faces(self):
+        # dirty_cube.blend: a normal 8-vertex/6-face cube plus one truly isolated point (no edges
+        # at all) and one zero-area degenerate face (three collinear, well-separated points --
+        # not near-duplicates, so this exercises Blender's own zero-area detection, not just a
+        # distance-based vertex merge). Hand-known exact expected output: back down to the plain
+        # cube's own 8 vertices / 12 triangles, 4 loose vertices removed (1 truly isolated + 3
+        # left behind once the degenerate face itself is dissolved -- confirmed directly that
+        # dissolve_degenerate leaves its face's own vertices as new orphans, not removed with it),
+        # 1 degenerate face removed.
+        out = self.out / "cube_cleaned.blend"
+        proc = run("optimize.py", str(DIRTY_CUBE_FIXTURE), "-o", str(out), "--clean-mesh", "--json")
+        self.assertEqual(proc.returncode, 0, proc.stderr)
+        data = json.loads(proc.stdout)
+        self.assertEqual(data["loose_vertices_removed"], 4)
+        self.assertEqual(data["degenerate_faces_removed"], 1)
+        self.assertEqual(data["triangles_before"], 13)
+        self.assertEqual(data["triangles_after"], 12)
+
+        info = json.loads(run("info.py", str(out), "--json").stdout)
+        self.assertEqual(info["meshes"]["vertices"], 8)
+        self.assertEqual(info["meshes"]["triangles"], 12)
+
+    def test_optimize_clean_mesh_is_a_noop_without_the_flag(self):
+        out = self.out / "cube_untouched.blend"
+        proc = run("optimize.py", str(DIRTY_CUBE_FIXTURE), "-o", str(out), "--json")
+        self.assertEqual(proc.returncode, 0, proc.stderr)
+        data = json.loads(proc.stdout)
+        self.assertEqual(data["loose_vertices_removed"], 0)
+        self.assertEqual(data["degenerate_faces_removed"], 0)
+        self.assertEqual(data["triangles_before"], data["triangles_after"])
+
+    def test_optimize_clean_mesh_is_a_noop_on_a_point_cloud(self):
+        # points.ply: a 1000-point vertices-only mesh, no faces at all -- every one of its
+        # vertices touches zero faces by definition, so a naive "vertex touching no face is
+        # orphan" pass would delete the entire point cloud without this guard. Caught before
+        # shipping (not by review): confirmed the point count survives --clean-mesh exactly.
+        out = self.out / "points_cleaned.ply"
+        proc = run("optimize.py", str(POINT_CLOUD_FIXTURE), "-o", str(out), "--clean-mesh", "--json")
+        self.assertEqual(proc.returncode, 0, proc.stderr)
+        data = json.loads(proc.stdout)
+        self.assertEqual(data["loose_vertices_removed"], 0)
+        self.assertEqual(data["degenerate_faces_removed"], 0)
+
+        info = json.loads(run("info.py", str(out), "--json").stdout)
+        self.assertEqual(info["meshes"]["vertices"], 1000)
+
+    def test_optimize_clean_mesh_leaves_an_already_clean_mesh_untouched(self):
+        out = self.out / "box_cleaned.glb"
+        proc = run("optimize.py", str(FIXTURE), "-o", str(out), "--clean-mesh", "--json")
+        self.assertEqual(proc.returncode, 0, proc.stderr)
+        data = json.loads(proc.stdout)
+        self.assertEqual(data["loose_vertices_removed"], 0)
+        self.assertEqual(data["degenerate_faces_removed"], 0)
+        self.assertEqual(data["triangles_before"], data["triangles_after"])
+
+    def test_optimize_clean_mesh_does_not_destroy_a_wire_mesh(self):
+        # wire_mesh.blend: a real 4-vertex/3-edge open chain with zero faces (the kind a glTF
+        # LINES-primitive import or a skeleton/cage visualization produces) -- every one of its
+        # vertices touches zero faces by definition, the same criterion _clean_mesh uses for
+        # "orphan". Confirmed directly that narrowing the point-cloud guard to "no faces AND no
+        # edges" (as suggested in review) reintroduces exactly this failure: applying that
+        # narrower guard here deletes all 4 vertices outright, not just point clouds. The guard
+        # here stays "no faces at all", covering a wire mesh the same as a point cloud.
+        out = self.out / "wire_cleaned.blend"
+        proc = run("optimize.py", str(WIRE_MESH_FIXTURE), "-o", str(out), "--clean-mesh", "--json")
+        self.assertEqual(proc.returncode, 0, proc.stderr)
+        data = json.loads(proc.stdout)
+        self.assertEqual(data["loose_vertices_removed"], 0)
+        self.assertEqual(data["degenerate_faces_removed"], 0)
+
+        info = json.loads(run("info.py", str(out), "--json").stdout)
+        self.assertEqual(info["meshes"]["vertices"], 4)
+
+    def test_optimize_clean_mesh_preserves_a_real_tiny_nondegenerate_face(self):
+        # tiny_legit_triangle.blend: a real, non-degenerate micro-scale triangle (edges of 5e-5
+        # units, a real ~1.25e-9 area -- the kind of fine detail a jewelry/PCB/scientific-scale
+        # asset can legitimately have). Confirmed directly that _DEGENERATE_DIST=1e-4 (matching
+        # bpy.ops.mesh.dissolve_degenerate's own edit-mode default) collapses this real face away
+        # entirely (3 verts/1 poly -> 1 vert/0 polys); at dist=0.0, dissolve_degenerate's separate
+        # exact-area "degenerate ear" mechanism (not gated by dist at all) still correctly removes
+        # a genuinely zero-area face (see the dirty-cube test above) while this real one survives.
+        out = self.out / "tiny_cleaned.blend"
+        proc = run("optimize.py", str(TINY_LEGIT_TRIANGLE_FIXTURE), "-o", str(out), "--clean-mesh", "--json")
+        self.assertEqual(proc.returncode, 0, proc.stderr)
+        data = json.loads(proc.stdout)
+        self.assertEqual(data["loose_vertices_removed"], 0)
+        self.assertEqual(data["degenerate_faces_removed"], 0)
+
+        info = json.loads(run("info.py", str(out), "--json").stdout)
+        self.assertEqual(info["meshes"]["vertices"], 3)
+        self.assertEqual(info["meshes"]["triangles"], 1)
+
+    def test_optimize_vertex_cache_report_matches_a_hand_computed_acmr(self):
+        # vertex_cache_quad.blend: two triangles sharing an edge, tri1=(A,B,C) tri2=(A,C,D), in
+        # this exact creation order. Hand-traced FIFO cache simulation (cache_size=32, well above
+        # this mesh's 4 vertices so no eviction occurs): tri1's A/B/C are all misses (cache
+        # empty) -- 3 misses. tri2's A and C are already cached -- hits; D is a miss -- 1 miss.
+        # Total 4 misses / 2 triangles = ACMR 2.0 exactly. No topology-changing flag is given, so
+        # acmr_before and acmr_after must be identical.
+        out = self.out / "quad_vcr.blend"
+        proc = run("optimize.py", str(VERTEX_CACHE_QUAD_FIXTURE), "-o", str(out), "--vertex-cache-report", "--json")
+        self.assertEqual(proc.returncode, 0, proc.stderr)
+        data = json.loads(proc.stdout)
+        self.assertEqual(len(data["vertex_cache_report"]), 1)
+        row = data["vertex_cache_report"][0]
+        self.assertAlmostEqual(row["acmr_before"], 2.0, places=9)
+        self.assertAlmostEqual(row["acmr_after"], 2.0, places=9)
+
+    def test_optimize_vertex_cache_report_is_empty_without_the_flag(self):
+        out = self.out / "quad_no_vcr.blend"
+        proc = run("optimize.py", str(VERTEX_CACHE_QUAD_FIXTURE), "-o", str(out), "--json")
+        self.assertEqual(proc.returncode, 0, proc.stderr)
+        self.assertEqual(json.loads(proc.stdout)["vertex_cache_report"], [])
+
+    def test_optimize_vertex_cache_report_reflects_this_runs_own_topology_changes(self):
+        # highpoly_sphere.blend, decimated to 10%: acmr_before is measured on the pristine
+        # imported mesh, acmr_after on the same object post-decimate -- a real, different
+        # triangle order, so the two values are not required to match (unlike the no-op case
+        # above). 3.0 is ACMR's one real, provable upper bound (a triangle touches at most 3
+        # vertices, so it can contribute at most 3 misses, regardless of topology) -- 0.5 is only
+        # a common target for a large closed mesh, not a universal floor (see the next test), so
+        # it is deliberately not asserted here.
+        out = self.out / "sphere_vcr.blend"
+        proc = run("optimize.py", str(ROOT / "tests" / "fixtures" / "highpoly_sphere.blend"), "-o", str(out),
+                   "--vertex-cache-report", "--decimate-ratio", "0.1", "--json")
+        self.assertEqual(proc.returncode, 0, proc.stderr)
+        data = json.loads(proc.stdout)
+        self.assertEqual(len(data["vertex_cache_report"]), 1)
+        row = data["vertex_cache_report"][0]
+        for acmr in (row["acmr_before"], row["acmr_after"]):
+            self.assertGreater(acmr, 0.0)
+            self.assertLessEqual(acmr, 3.0)
+
+    def test_optimize_vertex_cache_report_is_none_null_n_a_for_a_zero_triangle_mesh(self):
+        # wire_mesh.blend: the same real zero-face, zero-triangle open wire chain used by the
+        # --clean-mesh tests above, reused here for --vertex-cache-report's own zero-triangle
+        # path (previously only exercised by numeric fixtures) -- _vertex_cache_acmr returns
+        # None (nothing to report, not a divide-by-zero), which --json serializes as null and
+        # text mode prints as the literal "n/a" (confirmed against the real CLI before writing
+        # this test).
+        out_json = self.out / "wire_vcr.blend"
+        proc = run("optimize.py", str(WIRE_MESH_FIXTURE), "-o", str(out_json), "--vertex-cache-report", "--json")
+        self.assertEqual(proc.returncode, 0, proc.stderr)
+        data = json.loads(proc.stdout)
+        self.assertEqual(len(data["vertex_cache_report"]), 1)
+        row = data["vertex_cache_report"][0]
+        self.assertIsNone(row["acmr_before"])
+        self.assertIsNone(row["acmr_after"])
+
+        out_text = self.out / "wire_vcr_text.blend"
+        proc = run("optimize.py", str(WIRE_MESH_FIXTURE), "-o", str(out_text), "--vertex-cache-report")
+        self.assertEqual(proc.returncode, 0, proc.stderr)
+        self.assertIn("ACMR n/a -> n/a", proc.stdout)
+
+    def test_optimize_vertex_cache_report_acmr_can_score_below_the_common_05_target(self):
+        # vertex_cache_hub.blend: 6 vertices, all 20 possible triangular faces among them (a
+        # deliberately non-manifold "every combination" construction) -- a real, valid mesh whose
+        # hand-derivable best case (6 distinct vertices, all fit in a 32-entry cache with zero
+        # eviction, so total misses = 6) gives ACMR = 6/20 = 0.3, confirmed directly against a
+        # real Blender 4.2.23. 0.5 is documented as a common target, not a floor -- this is the
+        # regression test proving that claim, not just an assertion of it.
+        out = self.out / "hub_vcr.blend"
+        proc = run("optimize.py", str(ROOT / "tests" / "fixtures" / "vertex_cache_hub.blend"), "-o", str(out),
+                   "--vertex-cache-report", "--json")
+        self.assertEqual(proc.returncode, 0, proc.stderr)
+        data = json.loads(proc.stdout)
+        self.assertEqual(len(data["vertex_cache_report"]), 1)
+        row = data["vertex_cache_report"][0]
+        self.assertAlmostEqual(row["acmr_before"], 0.3, places=9)
+        self.assertLess(row["acmr_before"], 0.5)
+
+    def test_optimize_generate_mipmaps_matches_a_hand_computed_chain_on_a_real_texture(self):
+        # fox.glb's own single texture ("Image_0") is 1024x1024 -- the real, hand-derivable full
+        # mip chain is 1024,512,256,128,64,32,16,8,4,2,1 (11 levels: floor(log2(1024))+1), down
+        # to the standard GPU mip-chain floor of 1x1, not an arbitrary cutoff. Verified against
+        # the actual PNG bytes on disk (not just the tool's own reported JSON) for level 0 and
+        # the last two levels, where an off-by-one in the halve-until-1x1 loop would most likely
+        # show up.
+        out = self.out / "fox_mipmaps.glb"
+        mip_dir = self.out / "mips"
+        proc = run("optimize.py", str(ROOT / "tests" / "fixtures" / "fox.glb"), "-o", str(out),
+                   "--generate-mipmaps", str(mip_dir), "--json")
+        self.assertEqual(proc.returncode, 0, proc.stderr)
+        data = json.loads(proc.stdout)
+        self.assertEqual(len(data["mipmaps_generated"]), 1)
+        entry = data["mipmaps_generated"][0]
+        self.assertEqual(entry["name"], "Image_0")
+        self.assertEqual(entry["width"], 1024)
+        self.assertEqual(entry["height"], 1024)
+        levels = entry["levels"]
+        expected_sizes = [1024, 512, 256, 128, 64, 32, 16, 8, 4, 2, 1]
+        self.assertEqual([lvl["width"] for lvl in levels], expected_sizes)
+        self.assertEqual([lvl["height"] for lvl in levels], expected_sizes)
+        self.assertEqual(_png_dims(levels[0]["path"]), (1024, 1024))
+        self.assertEqual(_png_dims(levels[-2]["path"]), (2, 2))
+        self.assertEqual(_png_dims(levels[-1]["path"]), (1, 1))
+
+        # The throwaway copy this feature scales must never touch the real texture still
+        # referenced by this run's own export -- confirmed against the exported glb's own real
+        # embedded PNG bytes, not Blender's in-memory report.
+        self.assertEqual(_glb_image_dims(out), (1024, 1024))
+
+    def test_optimize_generate_mipmaps_is_empty_without_the_flag(self):
+        out = self.out / "fox_no_mipmaps.glb"
+        proc = run("optimize.py", str(ROOT / "tests" / "fixtures" / "fox.glb"), "-o", str(out), "--json")
+        self.assertEqual(proc.returncode, 0, proc.stderr)
+        data = json.loads(proc.stdout)
+        self.assertEqual(data["mipmaps_generated"], [])
+
+    def test_optimize_generate_mipmaps_level_zero_reflects_this_runs_own_texture_max_resize(self):
+        # Combined with --texture-max 256: mip level 0 must be the *resized* 256x256 texture this
+        # run is actually exporting, not the original 1024x1024 -- otherwise a downstream
+        # pipeline's mip chain wouldn't match its own base texture.
+        out = self.out / "fox_mipmaps_resized.glb"
+        mip_dir = self.out / "mips_resized"
+        proc = run("optimize.py", str(ROOT / "tests" / "fixtures" / "fox.glb"), "-o", str(out),
+                   "--texture-max", "256", "--generate-mipmaps", str(mip_dir), "--json")
+        self.assertEqual(proc.returncode, 0, proc.stderr)
+        data = json.loads(proc.stdout)
+        entry = data["mipmaps_generated"][0]
+        self.assertEqual(entry["width"], 256)
+        self.assertEqual(entry["height"], 256)
+        self.assertEqual(len(entry["levels"]), 9)  # floor(log2(256))+1
+        self.assertEqual(_png_dims(entry["levels"][0]["path"]), (256, 256))
+
+    def test_optimize_generate_mipmaps_prints_the_level_count_in_text_mode(self):
+        out = self.out / "fox_mipmaps_text.glb"
+        mip_dir = self.out / "mips_text"
+        proc = run("optimize.py", str(ROOT / "tests" / "fixtures" / "fox.glb"), "-o", str(out),
+                   "--generate-mipmaps", str(mip_dir))
+        self.assertEqual(proc.returncode, 0, proc.stderr)
+        self.assertIn("mipmaps for Image_0: 11 level(s) (1024x1024 down to 1x1)", proc.stdout)
+
+    def test_optimize_generate_mipmaps_avoids_case_insensitive_filename_collisions(self):
+        # case_collision_textures.blend: two cubes, each with its own real, distinctly-named
+        # texture ("Albedo" and "albedo") -- Blender itself guarantees Image.name is unique, but
+        # a naive case-sensitive collision check would still let both sanitize to filenames that
+        # are the *same real file* on a case-insensitive filesystem (macOS/Windows, both in this
+        # project's own CI matrix), silently letting the second mip chain overwrite the first.
+        out = self.out / "case_collision.blend"
+        mip_dir = self.out / "mips_case"
+        proc = run("optimize.py", str(ROOT / "tests" / "fixtures" / "case_collision_textures.blend"),
+                   "-o", str(out), "--generate-mipmaps", str(mip_dir), "--json")
+        self.assertEqual(proc.returncode, 0, proc.stderr)
+        data = json.loads(proc.stdout)
+        self.assertEqual({m["name"] for m in data["mipmaps_generated"]}, {"Albedo", "albedo"})
+        paths = [m["levels"][0]["path"] for m in data["mipmaps_generated"]]
+        # The real regression: even case-*folded*, the two level-0 paths must differ.
+        self.assertNotEqual(paths[0].casefold(), paths[1].casefold())
+        for p in paths:
+            self.assertTrue(Path(p).exists())
+
+    def test_optimize_flip_normal_map_green_inverts_only_the_green_channel_of_a_real_normal_map(self):
+        # normal_map_cube.blend: a cube with two textures -- "normal_tex" (R=0.8,G=0.9,B=0.6,
+        # deliberately asymmetric so a flip is unambiguous), genuinely wired through a Normal Map
+        # node into the material's Normal input, and "decoy_tex" (R=0.1,G=0.9,B=0.6) wired
+        # directly into Base Color -- NOT a normal map, to prove the flip only touches a real one.
+        # Verified against the actual embedded PNG bytes in both outputs (not just this tool's
+        # own JSON claim): unflipped normal_tex's top-left pixel is (204,230,153) -- exactly
+        # round(0.8*255), round(0.9*255), round(0.6*255). After the flip: R and B are bit-for-bit
+        # identical (204, 153); G drops to ~25 (round((1-0.9)*255)=26, off by one from float32
+        # precision in 1.0-0.9 -- a tolerance, not an exact match, accounts for that). decoy_tex
+        # is bit-for-bit identical in both outputs -- untouched, as required.
+        base = self.out / "nm_base.glb"
+        flipped = self.out / "nm_flipped.glb"
+        fixture = str(ROOT / "tests" / "fixtures" / "normal_map_cube.blend")
+        proc_base = run("optimize.py", fixture, "-o", str(base), "--json")
+        self.assertEqual(proc_base.returncode, 0, proc_base.stderr)
+        proc_flip = run("optimize.py", fixture, "-o", str(flipped), "--flip-normal-map-green", "--json")
+        self.assertEqual(proc_flip.returncode, 0, proc_flip.stderr)
+        data = json.loads(proc_flip.stdout)
+        self.assertEqual(data["normal_maps_flipped"], ["normal_tex"])
+
+        base_images = {}
+        flipped_images = {}
+        for path, dest in ((base, base_images), (flipped, flipped_images)):
+            with open(path, "rb") as f:
+                f.read(12)
+                json_len, _ = struct.unpack("<II", f.read(8))
+                gltf = json.loads(f.read(json_len))
+            for i, image in enumerate(gltf["images"]):
+                dest[image["name"]] = _png_top_left_pixel(_glb_image_png_bytes(path, i))
+
+        r0, g0, b0, a0 = base_images["normal_tex"]
+        r1, g1, b1, a1 = flipped_images["normal_tex"]
+        self.assertEqual((r0, b0, a0), (204, 153, 255))
+        self.assertEqual((r1, b1, a1), (204, 153, 255))  # R/B/A untouched by the flip
+        self.assertEqual(g0, 230)
+        self.assertAlmostEqual(g1, 25, delta=1)  # ~round((1-0.9)*255); float32 precision, not exact
+        self.assertEqual(base_images["decoy_tex"], flipped_images["decoy_tex"])  # decoy untouched
+
+    def test_optimize_flip_normal_map_green_is_empty_without_the_flag(self):
+        out = self.out / "nm_no_flag.glb"
+        proc = run("optimize.py", str(ROOT / "tests" / "fixtures" / "normal_map_cube.blend"), "-o", str(out), "--json")
+        self.assertEqual(proc.returncode, 0, proc.stderr)
+        data = json.loads(proc.stdout)
+        self.assertEqual(data["normal_maps_flipped"], [])
+
+    def test_optimize_flip_normal_map_green_prints_the_flipped_name_in_text_mode(self):
+        out = self.out / "nm_text.glb"
+        proc = run("optimize.py", str(ROOT / "tests" / "fixtures" / "normal_map_cube.blend"), "-o", str(out), "--flip-normal-map-green")
+        self.assertEqual(proc.returncode, 0, proc.stderr)
+        self.assertIn("flipped the green channel on normal map(s): normal_tex", proc.stdout)
+
+    def test_optimize_flip_normal_map_green_finds_a_normal_map_on_a_non_first_bsdf_node(self):
+        # multi_bsdf_normal_map.blend: two real Principled BSDF nodes blended through a Mix
+        # Shader (a genuine, working Blender pattern, confirmed directly) -- the FIRST BSDF has
+        # no normal map at all, the SECOND has "second_bsdf_normal" wired through a real Normal
+        # Map node. A naive next(n for n in nodes if n.type == "BSDF_PRINCIPLED") search (the
+        # same single-BSDF pattern info.py's own _colorspace_issues/_find_alpha_image already
+        # use) would stop at the first, normal-map-less BSDF and silently miss this one entirely.
+        out = self.out / "multi_bsdf_out.glb"
+        proc = run("optimize.py", str(ROOT / "tests" / "fixtures" / "multi_bsdf_normal_map.blend"),
+                   "-o", str(out), "--flip-normal-map-green", "--json")
+        self.assertEqual(proc.returncode, 0, proc.stderr)
+        data = json.loads(proc.stdout)
+        self.assertEqual(data["normal_maps_flipped"], ["second_bsdf_normal"])
+
+    def test_optimize_target_roblox_clamps_to_the_real_20000_triangle_budget(self):
+        # highpoly_sphere.blend: a 20,480-triangle icosphere, just over Roblox's own published
+        # "individual meshes cannot exceed 20,000 triangles" (create.roblox.com/docs/art/
+        # modeling/specifications). --target-roblox's triangle_budget is converted into a real
+        # decimate ratio from this file's own actual triangle count, not a fixed fraction that
+        # couldn't guarantee compliance for an arbitrary input size.
+        out = self.out / "sphere_roblox.blend"
+        proc = run("optimize.py", str(ROOT / "tests" / "fixtures" / "highpoly_sphere.blend"), "-o", str(out), "--target-roblox", "--json")
+        self.assertEqual(proc.returncode, 0, proc.stderr)
+        data = json.loads(proc.stdout)
+        self.assertEqual(data["triangles_before"], 20480)
+        self.assertLessEqual(data["triangles_after"], 20_000)
+
+        info = json.loads(run("info.py", str(out), "--json").stdout)
+        self.assertLessEqual(info["meshes"]["triangles"], 20_000)
+
+    def test_optimize_explicit_decimate_ratio_overrides_a_targets_triangle_budget(self):
+        # An explicit --decimate-ratio must win over --target-roblox's own budget-derived ratio,
+        # not just happen to produce a similar result: --decimate-ratio 0.9 on the same
+        # 20,480-triangle fixture gives exactly 20480*0.9 = 18432 -- a value the budget-derived
+        # ratio (20000/20480 ~= 0.9766) would never produce, proving the explicit value was
+        # actually used rather than silently ignored in favor of the target's own default.
+        out = self.out / "sphere_roblox_explicit_ratio.blend"
+        proc = run("optimize.py", str(ROOT / "tests" / "fixtures" / "highpoly_sphere.blend"), "-o", str(out), "--target-roblox", "--decimate-ratio", "0.9", "--json")
+        self.assertEqual(proc.returncode, 0, proc.stderr)
+        data = json.loads(proc.stdout)
+        self.assertEqual(data["triangles_after"], 18432)
+
+    def test_optimize_target_roblox_never_decimates_two_individually_compliant_meshes(self):
+        # two_compliant_meshes.blend: SphereA/SphereB, 18,800 triangles each (individually under
+        # Roblox's real 20,000-triangle-*per-mesh* cap) but 37,600 combined. Roblox's own limit is
+        # explicitly per individual mesh, not a scene total -- summing before comparing (this
+        # feature's first version, shared with --target-vrchat/--target-quicklook, which really
+        # are whole-avatar/whole-scene budgets) would wrongly decimate both meshes down to fit a
+        # 20,000 *aggregate*, a case Roblox's real limit never actually restricts. Reproduced
+        # directly: reverting just the per-mesh fix decimates this fixture to 20,000 combined.
+        out = self.out / "two_compliant_roblox.blend"
+        proc = run("optimize.py", str(ROOT / "tests" / "fixtures" / "two_compliant_meshes.blend"), "-o", str(out), "--target-roblox", "--json")
+        self.assertEqual(proc.returncode, 0, proc.stderr)
+        data = json.loads(proc.stdout)
+        self.assertEqual(data["triangles_before"], 37600)
+        self.assertEqual(data["triangles_after"], 37600)
+
+    def test_optimize_target_vrchat_recalculates_aggregate_budget_after_fill_holes(self):
+        # vrchat_boundary_hole.blend: a sphere with one real hole, 69,960 triangles as imported
+        # (just under VRChat's 70,000 aggregate budget -- an "aggregate" ratio computed from this
+        # pre-fill-holes count alone would conclude no decimation is needed at all). --fill-holes
+        # then adds enough geometry back to push the real total to 70,632, over budget -- a
+        # decision already made from the stale pre-fill-holes count never revisits that. Reproduced
+        # directly: reverting just this fix (computing the aggregate ratio from before_tris instead
+        # of the post-topology-change count) exports 70,632 triangles, over budget.
+        # (info.py's own verification is skipped here -- its self-intersection/thickness checks
+        # are prohibitively slow on a mesh this size, confirmed independently: over two minutes
+        # for a single run. optimize.py's own triangles_after is a directly measured count from
+        # the same real Blender data, not a guess, so it alone is sufficient here.)
+        out = self.out / "vrchat_boundary_out.blend"
+        proc = run("optimize.py", str(ROOT / "tests" / "fixtures" / "vrchat_boundary_hole.blend"), "-o", str(out), "--target-vrchat", "--fill-holes", "--json")
+        self.assertEqual(proc.returncode, 0, proc.stderr)
+        data = json.loads(proc.stdout)
+        self.assertEqual(data["triangles_before"], 69960)
+        self.assertLessEqual(data["triangles_after"], 70_000)
+
+    def test_optimize_target_triangle_budget_is_a_noop_when_already_within_budget(self):
+        # The same 20,480-triangle fixture is well under --target-vrchat's 70,000 and
+        # --target-quicklook's 100,000 triangle_budget -- neither should decimate anything.
+        for target in ("vrchat", "quicklook"):
+            with self.subTest(target=target):
+                out = self.out / f"sphere_{target}.blend"
+                proc = run("optimize.py", str(ROOT / "tests" / "fixtures" / "highpoly_sphere.blend"), "-o", str(out), f"--target-{target}", "--json")
+                self.assertEqual(proc.returncode, 0, proc.stderr)
+                data = json.loads(proc.stdout)
+                self.assertEqual(data["triangles_before"], data["triangles_after"])
+
+    def test_optimize_target_sketchfab_and_gltf_viewer_texture_caps(self):
+        # No official triangle cap on either target (both left un-decimated by design), but real
+        # texture-cap differences: sketchfab (4096, matching Sketchfab's own "1 to 4 4K textures"
+        # recommendation) vs gltf-viewer (1024, a lighter/faster-loading preset). Verified against
+        # box.glb's own texture -- both presets' texture_max exceed its actual size, so this
+        # confirms both flags parse and run cleanly end to end rather than the (trivial, no-op)
+        # resize itself.
+        for target in ("sketchfab", "gltf-viewer"):
+            with self.subTest(target=target):
+                out = self.out / f"box_{target}.glb"
+                proc = run("optimize.py", str(FIXTURE), "-o", str(out), f"--target-{target}", "--json")
+                self.assertEqual(proc.returncode, 0, proc.stderr)
+
+    def test_optimize_decimates_to_requested_ratio(self):
+        out = self.out / "box_opt.glb"
+        proc = run("optimize.py", str(FIXTURE), "-o", str(out), "--decimate-ratio", "0.5", "--json")
+        self.assertEqual(proc.returncode, 0, proc.stderr)
+        data = json.loads(proc.stdout)
+        self.assertEqual(data["triangles_before"], 12)
+        self.assertLessEqual(data["triangles_after"], 12)
+
+    def test_check_3d_print_target_passes_on_a_watertight_cube(self):
+        stl = self.out / "box.stl"
+        run("convert.py", str(FIXTURE), "-o", str(stl))
+        proc = run("check.py", str(stl), "--target", "3d-print", "--json")
+        self.assertEqual(proc.returncode, 0, proc.stderr)
+        data = json.loads(proc.stdout)
+        self.assertEqual(data["overall"], "PASS")
+
+    def test_look_compare_scores_inverted_solid_colors_at_the_theoretical_floor(self):
+        # Solid black vs. solid white, same dims -- the maximum possible per-pixel error (a
+        # normalized-float MSE of exactly 1.0), so PSNR is exactly 10*log10(1/1) = 0 dB and SSIM
+        # reduces to the constant-image closed form C1/(1+C1) (means 0 and 1, variances and
+        # covariance all 0, so only the C1/C2 stabilizer terms survive) -- both hand-derived, not
+        # just asserted "low".
+        black = self.out / "black.png"
+        white = self.out / "white.png"
+        _write_solid_png(black, 8, 8, (0, 0, 0))
+        _write_solid_png(white, 8, 8, (255, 255, 255))
+        proc = run("look.py", "--compare", str(black), str(white), "-o", str(self.out / "cmp.png"), "--json")
+        self.assertEqual(proc.returncode, 0, proc.stderr)
+        data = json.loads(proc.stdout)
+        self.assertAlmostEqual(data["psnr"], 0.0, places=6)
+        self.assertAlmostEqual(data["ssim"], 9.999000099990002e-05, places=9)
+
+    def test_look_compare_scores_identical_images_at_the_capped_sentinel(self):
+        # Two loads of the same file: MSE is exactly 0, which the textbook PSNR formula sends to
+        # +inf -- serialized as the finite _PSNR_IDENTICAL_DB sentinel instead (see _psnr's
+        # docstring: json.dump's default allow_nan=True would otherwise emit the bare token
+        # `Infinity`, which round-trips in Python but isn't valid JSON per RFC 8259 and would
+        # break a strict JSON parser reading this tool's output). SSIM's constant-image closed
+        # form is exactly 1.0 here (means/variances/covariance all match exactly).
+        same = self.out / "same.png"
+        _write_solid_png(same, 8, 8, (60, 120, 200))
+        proc = run("look.py", "--compare", str(same), str(same), "-o", str(self.out / "cmp.png"), "--json")
+        self.assertEqual(proc.returncode, 0, proc.stderr)
+        data = json.loads(proc.stdout)
+        self.assertEqual(data["psnr"], 100.0)
+        self.assertEqual(data["ssim"], 1.0)
+
+    def test_look_compare_prints_the_score_in_text_mode(self):
+        # Every other --compare test above passes --json, so scripts/look.py's own non-JSON text
+        # branch (main()'s `if "psnr" in data: print(f"  psnr: ...")`) was never actually
+        # exercised -- a regression in that f-string's formatting would have passed unnoticed.
+        black = self.out / "black_text.png"
+        white = self.out / "white_text.png"
+        _write_solid_png(black, 8, 8, (0, 0, 0))
+        _write_solid_png(white, 8, 8, (255, 255, 255))
+        out = self.out / "cmp_text.png"
+        proc = run("look.py", "--compare", str(black), str(white), "-o", str(out))
+        self.assertEqual(proc.returncode, 0, proc.stderr)
+        self.assertIn(f"wrote {out} (compare)", proc.stdout)
+        self.assertIn("psnr: 0.00 dB, ssim: 0.0001", proc.stdout)
+
+    def test_look_compare_prints_the_skip_reason_in_text_mode(self):
+        small = self.out / "small_text.png"
+        big = self.out / "big_text.png"
+        _write_solid_png(small, 4, 4, (10, 10, 10))
+        _write_solid_png(big, 8, 8, (10, 10, 10))
+        out = self.out / "cmp_text_skip.png"
+        proc = run("look.py", "--compare", str(small), str(big), "-o", str(out))
+        self.assertEqual(proc.returncode, 0, proc.stderr)
+        self.assertIn(f"wrote {out} (compare)", proc.stdout)
+        self.assertIn("score: skipped (images have different pixel dimensions, cannot score)", proc.stdout)
+
+    def test_look_compare_skips_the_score_for_mismatched_dimensions(self):
+        # PSNR/SSIM are only defined pixel-for-pixel -- comparing a 4x4 to an 8x8 must report why
+        # no score was computed instead of silently scoring the two images after --compare's own
+        # side-by-side resize (which would score the resize's own interpolation artifacts, not
+        # any real difference between the two source images).
+        small = self.out / "small.png"
+        big = self.out / "big.png"
+        _write_solid_png(small, 4, 4, (10, 10, 10))
+        _write_solid_png(big, 8, 8, (10, 10, 10))
+        proc = run("look.py", "--compare", str(small), str(big), "-o", str(self.out / "cmp.png"), "--json")
+        self.assertEqual(proc.returncode, 0, proc.stderr)
+        data = json.loads(proc.stdout)
+        self.assertNotIn("psnr", data)
+        self.assertNotIn("ssim", data)
+        self.assertIn("score_skipped", data)
+
+    def test_look_compare_skips_the_score_for_a_real_nan_pixel_instead_of_crashing_or_leaking_it(self):
+        # nan_pixel.exr: a real 8x8 float EXR with one literal NaN pixel (the kind a compositing
+        # divide-by-zero, or a corrupted render, can genuinely produce), saved and reloaded
+        # through Blender's own OPEN_EXR writer/reader -- confirmed the NaN survives that real
+        # round trip (an all-inf pixel does not; Blender's own EXR save clamps inf to a huge but
+        # finite value, so this fixture uses NaN specifically). Pre-fix, this crashed outright:
+        # a non-finite MSE makes _psnr's `math.log10(1.0 / mse)` call `math.log10(0.0)` (mse=inf)
+        # or propagate NaN through _ssim, either of which would have serialized JSON's non-tokens
+        # `Infinity`/`NaN` (invalid per RFC 8259) had it not crashed first. Caught by review.
+        proc = run("look.py", "--compare", str(ROOT / "tests" / "fixtures" / "nan_pixel.exr"),
+                   str(ROOT / "tests" / "fixtures" / "nan_pixel.exr"), "-o", str(self.out / "cmp.png"), "--json")
+        self.assertEqual(proc.returncode, 0, proc.stderr)
+        data = json.loads(proc.stdout)
+        self.assertNotIn("psnr", data)
+        self.assertNotIn("ssim", data)
+        self.assertEqual(data["score_skipped"], "one or both images contain non-finite (inf/NaN) pixel values")
+
+    def test_look_compare_scores_a_real_decimation_pass_between_the_two_extremes(self):
+        # A real before/after render pair (highpoly_sphere.blend, wireframe render, decimated
+        # 20,480 -> ~410 triangles) should score well below the identical-image sentinel but well
+        # above the solid-black-vs-white floor -- a sanity check on genuinely varying pixel data,
+        # not just the constant-color closed forms the other tests hand-derive exactly.
+        sphere = ROOT / "tests" / "fixtures" / "highpoly_sphere.blend"
+        decimated = self.out / "sphere_decimated.blend"
+        proc = run("optimize.py", str(sphere), "-o", str(decimated), "--decimate-ratio", "0.02", "--json")
+        self.assertEqual(proc.returncode, 0, proc.stderr)
+
+        before_png = self.out / "before.png"
+        after_png = self.out / "after.png"
+        self.assertEqual(run("look.py", str(sphere), "--wireframe", "-o", str(before_png), "--fast").returncode, 0)
+        self.assertEqual(run("look.py", str(decimated), "--wireframe", "-o", str(after_png), "--fast").returncode, 0)
+
+        proc = run("look.py", "--compare", str(before_png), str(after_png), "-o", str(self.out / "cmp.png"), "--json")
+        self.assertEqual(proc.returncode, 0, proc.stderr)
+        data = json.loads(proc.stdout)
+        self.assertLess(data["psnr"], 100.0)
+        self.assertGreater(data["psnr"], 0.0)
+        self.assertLess(data["ssim"], 1.0)
+        self.assertGreater(data["ssim"], 9.999000099990002e-05)
+
+    def test_batch_recipe_over_a_folder(self):
+        in_dir = self.out / "in"
+        in_dir.mkdir()
+        (in_dir / "box.glb").write_bytes(FIXTURE.read_bytes())
+        recipe = self.out / "recipe.json"
+        recipe.write_text(json.dumps({"steps": [{"script": "convert", "args": {"format": "obj"}}]}))
+        out_dir = self.out / "out"
+        proc = run("batch.py", str(in_dir), "--recipe", str(recipe), "--out-dir", str(out_dir), "--json")
+        self.assertEqual(proc.returncode, 0, proc.stderr)
+        results = json.loads(proc.stdout)
+        self.assertTrue(all(r["ok"] for r in results))
+        self.assertTrue((out_dir / "box_convert.obj").exists())
+
+    def test_fit_brings_an_over_triangle_budget_file_within_a_real_targets_budget(self):
+        # over_triangle_budget_grid.blend: a flat, 105,600-triangle grid -- deliberately just
+        # over ios-ar/android-ar's real 100,000-triangle budget (check.py's own _SPEC, the
+        # smallest triangle budget among every real target this skill knows). Decimate ratio is
+        # precise (confirmed elsewhere in this codebase), so this should converge in exactly 1
+        # stage, not need real escalation -- verified against the *actual* exported glb's own
+        # index-accessor count, not just this tool's own reported JSON.
+        out = self.out / "fit_grid.glb"
+        proc = run("fit.py", str(ROOT / "tests" / "fixtures" / "over_triangle_budget_grid.blend"),
+                   "-o", str(out), "--target", "ios-ar", "--json")
+        self.assertEqual(proc.returncode, 0, proc.stderr)
+        data = json.loads(proc.stdout)
+        self.assertTrue(data["met_budget"])
+        self.assertEqual(data["stages_used"], 1)
+        tri_row = next(r for r in data["checks"] if r["check"] == "triangle budget")
+        self.assertEqual(tri_row["status"], "PASS")
+
+        with open(out, "rb") as f:
+            f.read(12)
+            json_len, _ = struct.unpack("<II", f.read(8))
+            gltf = json.loads(f.read(json_len))
+        accessor = gltf["accessors"][gltf["meshes"][0]["primitives"][0]["indices"]]
+        self.assertLessEqual(accessor["count"] // 3, 100_000)
+
+    def test_fit_is_a_noop_stage_when_already_within_budget(self):
+        # box.glb (12 triangles) against sketchfab (500,000-triangle budget, no size budget that
+        # would ever require compression for a file this small) -- no decimation should even be
+        # attempted (decimate_ratio stays None in stage 0's own record), and it should pass on
+        # the very first stage.
+        out = self.out / "fit_noop.glb"
+        proc = run("fit.py", str(FIXTURE), "-o", str(out), "--target", "sketchfab", "--json")
+        self.assertEqual(proc.returncode, 0, proc.stderr)
+        data = json.loads(proc.stdout)
+        self.assertTrue(data["met_budget"])
+        self.assertEqual(data["stages_used"], 1)
+        self.assertIsNone(data["history"][0]["decimate_ratio"])
+
+    def test_fit_rejects_a_max_stages_below_one(self):
+        out = self.out / "fit_bad.glb"
+        proc = run("fit.py", str(FIXTURE), "-o", str(out), "--target", "sketchfab", "--max-stages", "0")
+        self.assertNotEqual(proc.returncode, 0)
+
+    def test_fit_prints_the_verdict_in_text_mode(self):
+        out = self.out / "fit_text.glb"
+        proc = run("fit.py", str(FIXTURE), "-o", str(out), "--target", "sketchfab")
+        self.assertEqual(proc.returncode, 0, proc.stderr)
+        self.assertIn("fits the sketchfab budget after 1 stage(s)", proc.stdout)
+
+    def test_fit_rejects_an_output_path_equal_to_the_input_path(self):
+        # The final (or only, on early convergence) stage's own shutil.move would otherwise
+        # silently overwrite the original input file with a lossy result -- even on a "still
+        # exceeds" run -- breaking the tool's own "always builds fresh from the original input"
+        # guarantee. Copy the fixture so a bug here can't clobber the real one.
+        same_path = self.out / "fit_inplace.glb"
+        shutil.copy(FIXTURE, same_path)
+        proc = run("fit.py", str(same_path), "-o", str(same_path), "--target", "sketchfab", "--json")
+        self.assertNotEqual(proc.returncode, 0)
+        data = json.loads(proc.stdout)
+        self.assertEqual(data["error"]["kind"], "input")
+        self.assertEqual(same_path.read_bytes(), FIXTURE.read_bytes())
+
+
+class TestFitInternals(unittest.TestCase):
+    """Pure-Python logic in fit.py that doesn't need Blender at all -- covers the escalation and
+    honest-failure paths a real end-to-end run can't easily force (decimate ratio's own real
+    precision, confirmed directly against Blender elsewhere in this suite, makes a genuine
+    multi-stage or still-failing real scenario impractical to construct reliably)."""
+
+    def setUp(self):
+        sys.path.insert(0, str(ROOT / "scripts"))
+        import fit
+        self.fit = fit
+
+    def test_next_stage_params_only_tightens_the_lever_for_a_still_failing_row(self):
+        # Triangle budget still WARN -> decimate ratio tightens; transmission size already PASS
+        # -> texture_max must be left untouched (never re-degrade a dimension that already
+        # passed).
+        texture_max, decimate_ratio = self.fit._next_stage_params(
+            {"triangle budget": "WARN", "transmission size": "PASS"}, texture_max=2048, decimate_ratio=0.9)
+        self.assertAlmostEqual(decimate_ratio, 0.63)
+        self.assertEqual(texture_max, 2048)
+
+    def test_next_stage_params_halves_texture_max_for_a_still_failing_transmission_size(self):
+        texture_max, decimate_ratio = self.fit._next_stage_params(
+            {"transmission size": "WARN"}, texture_max=2048, decimate_ratio=None)
+        self.assertEqual(texture_max, 1024)
+        self.assertIsNone(decimate_ratio)
+
+    def test_stage_rows_reports_met_budget_false_when_still_over_after_the_real_lever_was_applied(self):
+        # The property that matters most: this tool must never silently report success when a
+        # dimension it measured is still genuinely over budget.
+        rows = self.fit._stage_rows(tris_after=150_000, tri_budget=100_000, size_mb_budget=None, stage_out=str(FIXTURE))
+        self.assertEqual(rows[0]["status"], "WARN")
+        self.assertIn("150000 > 100000", rows[0]["detail"])
+
+    def test_next_stage_params_has_no_artificial_floor_below_which_a_ratio_cannot_be_tightened(self):
+        # optimize.py's own preset-driven ratio computation (scripts/bpy/optimize.py, triangle_budget
+        # / post_topology_tris) never clamps to a minimum -- a fixed 0.01 floor here would silently
+        # leave a large-enough input (e.g. an aggregate mesh needing ratio < 0.01 to reach a
+        # real target's budget) unfixable no matter how many stages run.
+        _texture_max, decimate_ratio = self.fit._next_stage_params(
+            {"triangle budget": "WARN"}, texture_max=None, decimate_ratio=0.005)
+        self.assertAlmostEqual(decimate_ratio, 0.0035)
+
+    def test_main_converts_a_stage_subprocess_timeout_into_a_structured_json_error(self):
+        # optimize.py's own subprocess.run() call in the stage loop must be caught the same way
+        # _run.py/_delegate.py already catch a Blender subprocess timing out elsewhere in this
+        # codebase (SkillError(kind="timeout")), not left to crash with a raw traceback that
+        # breaks the --json error contract. Mocks both Blender-launching calls (run_bpy and the
+        # optimize.py subprocess itself) so this exercises only the new try/except, not Blender.
+        from unittest import mock
+
+        fake_info = {"ok": True, "data": {"meshes": {"triangles": 12}}}
+        # Never actually opened -- subprocess.run is mocked to raise before optimize.py's own
+        # output path is ever touched.
+        out = Path(tempfile.gettempdir()) / "fit_timeout_never_written.glb"
+        argv = ["fit.py", str(FIXTURE), "-o", str(out), "--target", "sketchfab", "--json", "--timeout", "5"]
+        buf = io.StringIO()
+        with mock.patch.object(self.fit._run, "find_blender", return_value="blender"), \
+             mock.patch.object(self.fit._run, "run_bpy", return_value=fake_info), \
+             mock.patch.object(self.fit.subprocess, "run",
+                                side_effect=subprocess.TimeoutExpired(cmd="optimize.py", timeout=5)), \
+             mock.patch.object(sys, "argv", argv), \
+             contextlib.redirect_stdout(buf):
+            exit_code = self.fit.main()
+        self.assertEqual(exit_code, 3)  # _common.fail's own kind="timeout" -> exit 3
+        data = json.loads(buf.getvalue())
+        self.assertEqual(data["error"]["kind"], "timeout")
+
+
+if __name__ == "__main__":
+    unittest.main()

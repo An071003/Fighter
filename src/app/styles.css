@@ -1,0 +1,81 @@
+@import "tailwindcss";
+@import "../styles/tokens.css";
+@import "../styles/typography.css";
+
+* {
+  box-sizing: border-box;
+}
+
+html,
+body,
+#root {
+  width: 100%;
+  height: 100%;
+  margin: 0;
+  padding: 0;
+  background-color: var(--bg-0);
+  color: var(--text-primary);
+  font-family: var(--font-sans);
+  overflow: hidden;
+  user-select: none;
+  -webkit-font-smoothing: antialiased;
+}
+
+/* Custom thin scrollbar for part explorer */
+::-webkit-scrollbar {
+  width: 5px;
+  height: 5px;
+}
+::-webkit-scrollbar-track {
+  background: rgba(14, 20, 29, 0.4);
+}
+::-webkit-scrollbar-thumb {
+  background: rgba(149, 165, 179, 0.3);
+  border-radius: 9999px;
+}
+::-webkit-scrollbar-thumb:hover {
+  background: rgba(103, 229, 223, 0.6);
+}
+
+/* Visible accessible focus ring */
+:focus-visible {
+  outline: 2px solid var(--accent-ice);
+  outline-offset: 2px;
+}
+
+/* Custom range input styling for Explode Slider */
+input[type="range"].aeris-slider {
+  -webkit-appearance: none;
+  appearance: none;
+  background: transparent;
+  cursor: pointer;
+}
+
+input[type="range"].aeris-slider::-webkit-slider-runnable-track {
+  height: 6px;
+  border-radius: 9999px;
+  background: rgba(45, 59, 73, 0.85);
+  border: 1px solid rgba(103, 229, 223, 0.25);
+}
+
+input[type="range"].aeris-slider::-webkit-slider-thumb {
+  -webkit-appearance: none;
+  appearance: none;
+  width: 18px;
+  height: 18px;
+  border-radius: 9999px;
+  background: var(--accent-ice);
+  border: 2px solid #070A0F;
+  box-shadow: 0 0 12px rgba(103, 229, 223, 0.65);
+  margin-top: -7px;
+  transition: transform 150ms ease, background-color 150ms ease;
+}
+
+input[type="range"].aeris-slider:hover::-webkit-slider-thumb {
+  transform: scale(1.12);
+}
+
+input[type="range"].aeris-slider:disabled {
+  opacity: 0.4;
+  cursor: not-allowed;
+}
