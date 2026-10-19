@@ -39,29 +39,31 @@ export const selectIsFlightModeActive = (state: AppState): boolean =>
   state.mode === 'hover' ||
   state.mode === 'return-transition';
 
-export const selectDisplayModeBadge = (state: AppState): {
-  code: string;
-  labelVi: string;
-  labelEn: string;
-} => {
-  switch (state.mode) {
-    case 'showroom':
-      return { code: '01 / SHOWROOM', labelVi: 'Trưng bày 360°', labelEn: 'Showroom Orbit' };
-    case 'inspect':
-      return { code: '02 / INSPECT', labelVi: 'Soi chi tiết bộ phận', labelEn: 'Part Inspection' };
-    case 'exploded':
-      return { code: '02 / EXPLODED', labelVi: 'Bóc tách cấu trúc', labelEn: 'Exploded Assembly' };
-    case 'flight-transition':
-      return { code: '03 / TRANSITION', labelVi: 'Biến hình cất cánh', labelEn: 'Flight Transition' };
-    case 'hover':
-      return { code: '03 / HOVER', labelVi: 'Bay lơ lửng tại chỗ', labelEn: 'Anchored Hover' };
-    case 'return-transition':
-      return { code: '03 / LANDING', labelVi: 'Thu hồi về bàn xoay', labelEn: 'Return to Showroom' };
-    case 'error':
-      return { code: 'ERR / HALT', labelVi: 'Gián đoạn tải tài nguyên', labelEn: 'Resource Error' };
-    case 'boot':
-    case 'loading':
-    default:
-      return { code: '00 / INIT', labelVi: 'Đang nạp cấu trúc 3D', labelEn: 'Loading Assembly' };
-  }
+export interface DisplayModeBadge {
+  readonly code: string;
+  readonly labelVi: string;
+  readonly labelEn: string;
+}
+
+const DISPLAY_MODE_BADGES: Record<AppState['mode'], DisplayModeBadge> = {
+  showroom: { code: '01 / SHOWROOM', labelVi: 'Trưng bày 360°', labelEn: 'Showroom Orbit' },
+  inspect: { code: '02 / INSPECT', labelVi: 'Soi chi tiết bộ phận', labelEn: 'Part Inspection' },
+  exploded: { code: '02 / EXPLODED', labelVi: 'Bóc tách cấu trúc', labelEn: 'Exploded Assembly' },
+  'flight-transition': {
+    code: '03 / TRANSITION',
+    labelVi: 'Biến hình cất cánh',
+    labelEn: 'Flight Transition',
+  },
+  hover: { code: '03 / HOVER', labelVi: 'Bay lơ lửng tại chỗ', labelEn: 'Anchored Hover' },
+  'return-transition': {
+    code: '03 / LANDING',
+    labelVi: 'Thu hồi về bàn xoay',
+    labelEn: 'Return to Showroom',
+  },
+  error: { code: 'ERR / HALT', labelVi: 'Gián đoạn tải tài nguyên', labelEn: 'Resource Error' },
+  boot: { code: '00 / INIT', labelVi: 'Đang nạp cấu trúc 3D', labelEn: 'Loading Assembly' },
+  loading: { code: '00 / INIT', labelVi: 'Đang nạp cấu trúc 3D', labelEn: 'Loading Assembly' },
 };
+
+export const selectDisplayModeBadge = (state: AppState): DisplayModeBadge =>
+  DISPLAY_MODE_BADGES[state.mode] ?? DISPLAY_MODE_BADGES.loading;

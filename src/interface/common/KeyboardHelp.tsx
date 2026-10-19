@@ -1,0 +1,145 @@
+import React, { useEffect } from 'react';
+import { AlertTriangle, Keyboard, RefreshCw, X } from 'lucide-react';
+import { useAppStore } from '@/domain/store';
+
+export const KeyboardHelp: React.FC = () => {
+  const isHelpOpen = useAppStore((s) => s.isHelpOpen);
+  const setHelpOpen = useAppStore((s) => s.setHelpOpen);
+  const mode = useAppStore((s) => s.mode);
+  const errorReason = useAppStore((s) => s.errorReason);
+  const dispatch = useAppStore((s) => s.dispatch);
+
+  // Global keyboard shortcuts matching docs/04_FEATURES.md F02
+  useEffect(() => {
+    const handleKeyDown = (e: KeyboardEvent) => {
+      const target = e.target as HTMLElement | null;
+      if (
+        target &&
+        (target.tagName === 'INPUT' ||
+          target.tagName === 'TEXTAREA' ||
+          target.isContentEditable)
+      ) {
+        if (e.key === 'Escape') {
+          target.blur();
+        }
+        return;
+      }
+
+      if (e.key === 'Escape') {
+        const state = useAppStore.getState();
+        if (state.isHelpOpen) {
+          state.setHelpOpen(false);
+          return;
+        }
+        if (state.selectedPartId !== null) {
+          state.dispatch({ type: 'DESELECT_PART' });
+          return;
+        }
+        if (state.isPartsDrawerOpen) {
+          state.setPartsDrawerOpen(false);
+        }
+      } else if (e.key === 'r' || e.key === 'R') {
+        dispatch({ type: 'RESET_VIEW' });
+      } else if (e.key === 'e' || e.key === 'E') {
+        dispatch({ type: 'TOGGLE_EXPLODE' });
+      } else if (e.key === 'f' || e.key === 'F') {
+        const state = useAppStore.getState();
+        if (state.mode === 'hover') {
+          dispatch({ type: 'RETURN_TO_SHOWROOM' });
+        } else {
+          dispatch({ type: 'START_FLIGHT' });
+        }
+      } else if (e.key === '?') {
+        setHelpOpen(!useAppStore.getState().isHelpOpen);
+      }
+    };
+
+    window.addEventListener('keydown', handleKeyDown);
+    return () => window.removeEventListener('keydown', handleKeyDown);
+  }, [dispatch, setHelpOpen]);
+
+  // Honest Error / WebGL Fallback UI (docs/11_PERFORMANCE.md & docs/12_QA_ACCEPTANCE.md A05)
+  if (mode === 'error') {
+    return (
+      <div
+        role="alert"
+        data-testid="error-fallback-screen"
+        className="fixed inset-0 z-50 flex items-center justify-center bg-[#070A0F]/95 p-6"
+      >
+        <div className="max-w-md w-full rounded-2xl bg-[#0E141D] border border-[#FA8E91]/50 p-6 text-center shadow-2xl">
+          <div className="w-12 h-12 rounded-full bg-[#FA8E91]/15 text-[#FA8E91] flex items-center justify-center mx-auto mb-4">
+            <AlertTriangle className="w-6 h-6" />
+          </div>
+          <h2 className="text-lg font-semibold text-[#E9F0F5] mb-2">
+            Không thể khởi tạo cảnh 3D AERIS X-9
+          </h2>
+          <p className="text-sm text-[#95A5B3] mb-5">
+            {errorReason ??
+              'Tài nguyên mô hình GLB hoặc ngữ cảnh WebGL không khả dụng trên thiết bị này.'}
+          </p>
+          <button
+            type="button"
+            data-testid="error-retry-button"
+            onClick={() => dispatch({ type: 'RETRY' })}
+            className="min-h-[44px] px-5 py-2.5 rounded-xl bg-[#67E5DF] text-[#070A0F] font-semibold text-xs uppercase tracking-wider inline-flex items-center gap-2 hover:bg-[#67E5DF]/90 transition-colors"
+          >
+            <RefreshCw className="w-4 h-4" />
+            <span>Thử tải lại mô hình</span>
+          </button>
+        </div>
+      </div>
+    );
+  }
+
+  if (!isHelpOpen) return null;
+
+  return (
+    <div
+      role="dialog"
+      aria-modal="true"
+      aria-labelledby="keyboard-help-title"
+      data-testid="keyboard-help-modal"
+      className="fixed inset-0 z-50 flex items-center justify-center bg-[#070A0F]/80 backdrop-blur-md p-4"
+    >
+      <div className="max-w-md w-full rounded-2xl bg-[#0E141D] border border-[#2D3B49] p-6 shadow-2xl">
+        <div className="flex items-center justify-between mb-4">
+          <div className="flex items-center gap-2">
+            <Keyboard className="w-5 h-5 text-[#67E5DF]" />
+            <h2 id="keyboard-help-title" className="text-base font-semibold text-[#E9F0F5]">
+              Phím tắt &amp; Điều khiển tương tác
+            </h2>
+          </div>
+          <button
+            type="button"
+            data-testid="close-help-modal"
+            aria-label="Đóng bảng phím tắt"
+            onClick={() => setHelpOpen(false)}
+            className="min-h-[44px] min-w-[44px] flex items-center justify-center rounded-lg text-[#95A5B3] hover:text-[#E9F0F5]"
+          >
+            <X className="w-4 h-4" />
+          </button>
+        </div>
+
+        <div className="space-y-2.5 text-xs">
+          {[
+            { key: 'Kéo chuột / Chạm 1 ngón', desc: 'Xoay camera 360° quanh tiêm kích' },
+            { key: 'Cuộn chuột / Chụm 2 ngón', desc: 'Thu phóng cận cảnh giới hạn an toàn' },
+            { key: 'Click vào bộ phận 3D', desc: 'Chọn, nhấc nhẹ và mở bảng thông số' },
+            { key: 'E', desc: 'Bật / Tắt bóc tách cấu trúc (Exploded View)' },
+            { key: 'F', desc: 'Khởi động bay hoặc Hạ cánh về bàn xoay' },
+            { key: 'R', desc: 'Đặt lại góc máy quay chuẩn 3/4 Hero' },
+            { key: 'Esc', desc: 'Bỏ chọn bộ phận / Đóng bảng chi tiết' },
+          ].map((item) => (
+            <div
+              key={item.key}
+              className="flex items-center justify-between py-2 px-3 rounded-xl bg-[#070A0F]/70 border border-[#2D3B49]/60"
+            >
+              <span className="font-mono text-[#67E5DF] font-semibold">{item.key}</span>
+              <span className="text-[#95A5B3] text-right">{item.desc}</span>
+            </div>
+          ))}
+        </div>
+      </div>
+    </div>
+  );
+};
