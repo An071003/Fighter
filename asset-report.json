@@ -1,0 +1,41 @@
+{
+  "assetName": "AERIS X-9 — Original Concept Aircraft",
+  "filePath": "public/assets/aircraft/aeris-x9.glb",
+  "fileSizeBytes": 4479668,
+  "authoringTool": "Blender 4.5.10 LTS Headless Procedural BMesh Pipeline (scripts/generate_aeris_x9.py)",
+  "license": "CC0 1.0 Universal / Original Project Artwork (No external third-party meshes or unlicensed textures)",
+  "coordinateSystem": {
+    "up": "+Y",
+    "nose": "-Z",
+    "wings": "+-X"
+  },
+  "geometryStats": {
+    "meshObjectCount": 46,
+    "expectedManifestParts": 46,
+    "missingManifestNodes": [],
+    "totalTriangles": 183584,
+    "totalVertices": 91878,
+    "materialsCount": 8
+  },
+  "landingGearVerification": {
+    "front": [
+      "AX9__GEAR__FRONT__GEAR_STRUT_FRONT",
+      "AX9__GEAR__FRONT__GEAR_WHEEL_FRONT",
+      "AX9__GEAR__FRONT__GEAR_HUB_FRONT",
+      "AX9__GEAR__FRONT__GEAR_DOOR_FRONT"
+    ],
+    "left": [
+      "AX9__GEAR__LEFT__GEAR_STRUT_LEFT",
+      "AX9__GEAR__LEFT__GEAR_WHEEL_LEFT",
+      "AX9__GEAR__LEFT__GEAR_HUB_LEFT",
+      "AX9__GEAR__LEFT__GEAR_DOOR_LEFT"
+    ],
+    "right": [
+      "AX9__GEAR__RIGHT__GEAR_STRUT_RIGHT",
+      "AX9__GEAR__RIGHT__GEAR_WHEEL_RIGHT",
+      "AX9__GEAR__RIGHT__GEAR_HUB_RIGHT",
+      "AX9__GEAR__RIGHT__GEAR_DOOR_RIGHT"
+    ]
+  },
+  "status": "PASS"
+}
