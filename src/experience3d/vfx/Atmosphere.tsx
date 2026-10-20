@@ -28,7 +28,7 @@ export const Atmosphere: React.FC = () => {
 
   return (
     <>
-      <fog attach="fog" args={['#070A0F', 18, 44]} />
+      <fog attach="fog" args={['#0A0A0B', 20, 48]} />
 
       {/* Twin Decorative Afterburner Ion Plumes during Flight Sequence */}
       <group ref={plumeGroupRef} name="DecorativeIonPlumes" visible={false}>
@@ -36,7 +36,7 @@ export const Atmosphere: React.FC = () => {
           <coneGeometry args={[0.26, 1.35, 24, 1, true]} />
           <meshBasicMaterial
             ref={leftPlumeMatRef}
-            color="#67E5DF"
+            color="#FFB45C"
             transparent
             opacity={0}
             depthWrite={false}
@@ -46,7 +46,7 @@ export const Atmosphere: React.FC = () => {
           <coneGeometry args={[0.26, 1.35, 24, 1, true]} />
           <meshBasicMaterial
             ref={rightPlumeMatRef}
-            color="#67E5DF"
+            color="#FFB45C"
             transparent
             opacity={0}
             depthWrite={false}

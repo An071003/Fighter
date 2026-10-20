@@ -70,9 +70,9 @@ export const Turntable: React.FC = () => {
         <cylinderGeometry args={[5.2, 5.4, 0.22, 96]} />
         <meshStandardMaterial
           ref={registerMat}
-          color="#101822"
-          metalness={0.82}
-          roughness={0.24}
+          color="#111214"
+          metalness={0.25}
+          roughness={0.82}
         />
       </mesh>
 
@@ -81,9 +81,9 @@ export const Turntable: React.FC = () => {
         <cylinderGeometry args={[3.85, 3.95, 0.04, 96]} />
         <meshStandardMaterial
           ref={registerMat}
-          color="#16212E"
-          metalness={0.88}
-          roughness={0.2}
+          color="#151618"
+          metalness={0.2}
+          roughness={0.86}
         />
       </mesh>
 
@@ -92,20 +92,20 @@ export const Turntable: React.FC = () => {
         <cylinderGeometry args={[6.15, 6.45, 0.18, 96]} />
         <meshStandardMaterial
           ref={registerMat}
-          color="#0B1017"
-          metalness={0.76}
-          roughness={0.32}
+          color="#0C0D0E"
+          metalness={0.2}
+          roughness={0.9}
         />
       </mesh>
 
-      {/* Cyan Optical Halo Accent Ring */}
+      {/* Thin White Stage Ring */}
       <mesh position={[0, 0.005, 0]} rotation={[-Math.PI / 2, 0, 0]}>
         <ringGeometry args={[5.12, 5.19, 96]} />
         <meshStandardMaterial
           ref={registerMat}
-          color="#67E5DF"
-          emissive="#67E5DF"
-          emissiveIntensity={1.6}
+          color="#D9DDE2"
+          emissive="#D9DDE2"
+          emissiveIntensity={0.45}
           roughness={0.2}
           metalness={0.1}
         />
@@ -116,9 +116,9 @@ export const Turntable: React.FC = () => {
         <ringGeometry args={[2.35, 2.38, 72]} />
         <meshStandardMaterial
           ref={registerMat}
-          color="#FFBF81"
-          emissive="#FFBF81"
-          emissiveIntensity={0.85}
+          color="#BFC4CA"
+          emissive="#BFC4CA"
+          emissiveIntensity={0.25}
           roughness={0.3}
           metalness={0.2}
         />
@@ -129,9 +129,9 @@ export const Turntable: React.FC = () => {
         <boxGeometry args={[0.032, 0.004, 10.6]} />
         <meshStandardMaterial
           ref={registerMat}
-          color="#FF9E44"
-          emissive="#FF9E44"
-          emissiveIntensity={1.35}
+          color="#F5A623"
+          emissive="#F5A623"
+          emissiveIntensity={1.1}
           roughness={0.2}
         />
       </mesh>
@@ -141,9 +141,9 @@ export const Turntable: React.FC = () => {
         <boxGeometry args={[7.4, 0.003, 0.022]} />
         <meshStandardMaterial
           ref={registerMat}
-          color="#67E5DF"
-          emissive="#67E5DF"
-          emissiveIntensity={0.65}
+          color="#8A9097"
+          emissive="#8A9097"
+          emissiveIntensity={0.2}
           roughness={0.25}
         />
       </mesh>
@@ -156,7 +156,7 @@ export const Turntable: React.FC = () => {
             ref={registerMat}
             color="#4DFF9B"
             emissive="#4DFF9B"
-            emissiveIntensity={2.4}
+            emissiveIntensity={1.2}
           />
         </mesh>
       ))}
@@ -170,9 +170,9 @@ export const Turntable: React.FC = () => {
           <cylinderGeometry args={[0.042, 0.052, 0.012, 16]} />
           <meshStandardMaterial
             ref={registerMat}
-            color="#3898FF"
-            emissive="#3898FF"
-            emissiveIntensity={2.4}
+            color="#3D7BFF"
+            emissive="#3D7BFF"
+            emissiveIntensity={1.2}
           />
         </mesh>
       ))}
@@ -186,9 +186,9 @@ export const Turntable: React.FC = () => {
         <boxGeometry args={[0.14, 0.015, 0.025]} />
         <meshStandardMaterial
           ref={registerMat}
-          color="#67E5DF"
-          emissive="#67E5DF"
-          emissiveIntensity={0.9}
+          color="#9CA2A9"
+          emissive="#9CA2A9"
+          emissiveIntensity={0.3}
         />
       </instancedMesh>
     </group>

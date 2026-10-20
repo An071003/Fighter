@@ -21,8 +21,8 @@ export const CameraPresets: React.FC = () => {
       aria-label="Góc máy quay thiết lập sẵn"
       className="flex items-center gap-1 flex-nowrap whitespace-nowrap"
     >
-      <span className="hidden 2xl:inline-flex items-center gap-1 text-[11px] font-mono uppercase tracking-wider text-[#95A5B3] mr-1">
-        <Camera className="w-3.5 h-3.5 text-[#67E5DF]" />
+      <span className="hidden 2xl:inline-flex items-center gap-1 text-[11px] font-mono uppercase tracking-wider text-[#9A9EA4] mr-1">
+        <Camera className="w-3.5 h-3.5 text-[#F2F3F5]" />
         <span>Góc nhìn:</span>
       </span>
 
@@ -38,8 +38,8 @@ export const CameraPresets: React.FC = () => {
             onClick={() => dispatch({ type: 'SET_CAMERA_PRESET', preset: presetKey })}
             className={`min-h-[36px] px-2.5 py-1 rounded-lg text-[11px] font-medium transition-colors border whitespace-nowrap ${
               isActive
-                ? 'bg-[#17222E] text-[#67E5DF] border-[#67E5DF]/50'
-                : 'bg-[#070A0F]/75 text-[#95A5B3] hover:text-[#E9F0F5] border-[#2D3B49]/70 disabled:opacity-40 disabled:cursor-not-allowed'
+                ? 'bg-[#1C1D20] text-[#F2F3F5] border-[#F2F3F5]/50'
+                : 'bg-[#0A0A0B]/75 text-[#9A9EA4] hover:text-[#EDEEF0] border-[#333438]/70 disabled:opacity-40 disabled:cursor-not-allowed'
             }`}
           >
             {cfg.label.vi}
@@ -52,7 +52,7 @@ export const CameraPresets: React.FC = () => {
         data-testid="camera-reset-button"
         onClick={() => dispatch({ type: 'RESET_VIEW' })}
         title="Đặt lại góc máy quay (Phím R)"
-        className="min-h-[36px] min-w-[36px] px-2.5 py-1 rounded-lg text-[11px] font-medium bg-[#070A0F]/80 text-[#E9F0F5] hover:text-[#67E5DF] border border-[#2D3B49] hover:border-[#67E5DF]/50 flex items-center justify-center gap-1.5 transition-colors whitespace-nowrap"
+        className="min-h-[36px] min-w-[36px] px-2.5 py-1 rounded-lg text-[11px] font-medium bg-[#0A0A0B]/80 text-[#EDEEF0] hover:text-[#F2F3F5] border border-[#333438] hover:border-[#F2F3F5]/50 flex items-center justify-center gap-1.5 transition-colors whitespace-nowrap"
       >
         <RotateCcw className="w-3.5 h-3.5" />
         <span className="hidden md:inline">Đặt lại góc</span>

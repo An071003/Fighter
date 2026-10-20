@@ -38,7 +38,7 @@ export const App: React.FC = () => {
         data-testid="aeris-app-root"
         data-scene-mode={mode}
         data-asset-ready={assetReady ? 'true' : 'false'}
-        className="relative w-screen h-screen overflow-hidden bg-[#070A0F] text-[#E9F0F5]"
+        className="relative w-screen h-screen overflow-hidden bg-[#0A0A0B] text-[#EDEEF0]"
       >
         {/* Single Primary 3D WebGL Canvas */}
         <ExperienceCanvas />
@@ -52,11 +52,11 @@ export const App: React.FC = () => {
               exit={{ opacity: 0 }}
               transition={{ duration: 0.45 }}
               data-testid="loading-overlay"
-              className="fixed inset-0 z-40 flex flex-col items-center justify-center bg-[#070A0F]/92 backdrop-blur-md pointer-events-none"
+              className="fixed inset-0 z-40 flex flex-col items-center justify-center bg-[#0A0A0B]/92 backdrop-blur-md pointer-events-none"
             >
               <svg
                 viewBox="0 0 120 120"
-                className="w-20 h-20 text-[#67E5DF] mb-4 animate-pulse"
+                className="w-20 h-20 text-[#F2F3F5] mb-4 animate-pulse"
                 fill="none"
                 stroke="currentColor"
                 strokeWidth="1.5"
@@ -64,7 +64,7 @@ export const App: React.FC = () => {
               >
                 <path d="M60 12 L74 52 L110 72 L110 80 L72 74 L66 102 L82 110 L82 114 L60 108 L38 114 L38 110 L54 102 L48 74 L10 80 L10 72 L46 52 Z" />
               </svg>
-              <div className="font-mono text-xs tracking-widest uppercase text-[#67E5DF]">
+              <div className="font-mono text-xs tracking-widest uppercase text-[#F2F3F5]">
                 ĐANG NẠP CẤU TRÚC 3D AERIS X-9 (46 BỘ PHẬN)...
               </div>
             </motion.div>

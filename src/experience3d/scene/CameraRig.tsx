@@ -3,7 +3,7 @@ import { OrbitControls } from '@react-three/drei';
 import { useFrame, useThree } from '@react-three/fiber';
 import * as THREE from 'three';
 import type { OrbitControls as OrbitControlsImpl } from 'three-stdlib';
-import { CAMERA_PRESETS } from '@/domain/config';
+import { CAMERA_PRESETS, EXPLODE_LIFT_Y } from '@/domain/config';
 import { getPartById } from '@/domain/partRegistry';
 import { useAppStore } from '@/domain/store';
 import { getStoryPhase } from '@/domain/story';
@@ -73,11 +73,12 @@ export const CameraRig: React.FC = () => {
       }
     }
 
-    // Default preset camera position scaled for mobile & explode bounds
-    desiredTargetRef.current.set(...presetCfg.target);
+    // Default preset camera position scaled for mobile & explode bounds; follow the explode lift
+    const lift = EXPLODE_LIFT_Y * explodeProgress;
+    desiredTargetRef.current.set(presetCfg.target[0], presetCfg.target[1] + lift, presetCfg.target[2]);
     desiredPosRef.current.set(
       presetCfg.position[0] * mobileScale * explodeScale,
-      presetCfg.position[1] * mobileScale * explodeScale,
+      presetCfg.position[1] * mobileScale * explodeScale + lift,
       presetCfg.position[2] * mobileScale * explodeScale
     );
     isTransitionActiveRef.current = true;

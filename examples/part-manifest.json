@@ -111,7 +111,7 @@
       "explode": {
         "offset": [
           0,
-          -1.05,
+          -0.55,
           0
         ],
         "rotationDeg": [
@@ -167,7 +167,7 @@
       "explode": {
         "offset": [
           0,
-          1.5,
+          1.125,
           -0.8
         ],
         "rotationDeg": [
@@ -195,7 +195,7 @@
       "explode": {
         "offset": [
           0,
-          1.35,
+          1.013,
           -0.8
         ],
         "rotationDeg": [
@@ -223,7 +223,7 @@
       "explode": {
         "offset": [
           0,
-          1.4,
+          1.05,
           -1.0
         ],
         "rotationDeg": [
@@ -335,7 +335,7 @@
       "explode": {
         "offset": [
           -0.85,
-          1.35,
+          0.95,
           2.4
         ],
         "rotationDeg": [
@@ -587,7 +587,7 @@
       "explode": {
         "offset": [
           0.85,
-          1.35,
+          0.95,
           2.4
         ],
         "rotationDeg": [
@@ -755,7 +755,7 @@
       "explode": {
         "offset": [
           0.0,
-          -1.9,
+          -0.95,
           -0.6
         ],
         "rotationDeg": [
@@ -783,7 +783,7 @@
       "explode": {
         "offset": [
           0.0,
-          -2.4,
+          -1.3,
           -0.6
         ],
         "rotationDeg": [
@@ -811,7 +811,7 @@
       "explode": {
         "offset": [
           0,
-          -2.4,
+          -1.3,
           -0.6
         ],
         "rotationDeg": [
@@ -839,7 +839,7 @@
       "explode": {
         "offset": [
           0.0,
-          -1.25,
+          -0.5,
           -0.6
         ],
         "rotationDeg": [
@@ -867,7 +867,7 @@
       "explode": {
         "offset": [
           -0.75,
-          -1.9,
+          -0.95,
           0.6
         ],
         "rotationDeg": [
@@ -895,7 +895,7 @@
       "explode": {
         "offset": [
           -0.95,
-          -2.4,
+          -1.3,
           0.6
         ],
         "rotationDeg": [
@@ -923,7 +923,7 @@
       "explode": {
         "offset": [
           -1,
-          -2.4,
+          -1.3,
           0.6
         ],
         "rotationDeg": [
@@ -951,7 +951,7 @@
       "explode": {
         "offset": [
           -1.15,
-          -1.25,
+          -0.5,
           0.5
         ],
         "rotationDeg": [
@@ -979,7 +979,7 @@
       "explode": {
         "offset": [
           0.75,
-          -1.9,
+          -0.95,
           0.6
         ],
         "rotationDeg": [
@@ -1007,7 +1007,7 @@
       "explode": {
         "offset": [
           0.95,
-          -2.4,
+          -1.3,
           0.6
         ],
         "rotationDeg": [
@@ -1035,7 +1035,7 @@
       "explode": {
         "offset": [
           1,
-          -2.4,
+          -1.3,
           0.6
         ],
         "rotationDeg": [
@@ -1063,7 +1063,7 @@
       "explode": {
         "offset": [
           1.15,
-          -1.25,
+          -0.5,
           0.5
         ],
         "rotationDeg": [

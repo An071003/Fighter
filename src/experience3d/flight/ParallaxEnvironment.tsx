@@ -113,7 +113,7 @@ export const ParallaxEnvironment: React.FC = () => {
       <boxGeometry args={[1, 1, 1]} />
       <meshBasicMaterial
         ref={matRef}
-        color="#67E5DF"
+        color="#D9DDE2"
         transparent
         opacity={0}
         depthWrite={false}

@@ -112,7 +112,7 @@ export const WindTrails: React.FC = () => {
       <boxGeometry args={[1, 1, 1]} />
       <meshBasicMaterial
         ref={matRef}
-        color="#9AF5F0"
+        color="#E8ECF0"
         transparent
         opacity={0}
         depthWrite={false}

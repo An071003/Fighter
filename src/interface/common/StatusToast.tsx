@@ -38,15 +38,15 @@ export const StatusToast: React.FC = () => {
               exit={{ opacity: 0, y: -8, scale: 0.96 }}
               transition={{ duration: 0.22 }}
               data-testid="status-toast"
-              className="pointer-events-auto flex items-center gap-2.5 px-4 py-2.5 rounded-full bg-[#0E141D]/95 backdrop-blur-md border border-[#67E5DF]/40 text-xs text-[#E9F0F5] shadow-[0_12px_32px_rgba(0,0,0,0.55)]"
+              className="pointer-events-auto flex items-center gap-2.5 px-4 py-2.5 rounded-full bg-[#111113]/95 backdrop-blur-md border border-[#F2F3F5]/40 text-xs text-[#EDEEF0] shadow-[0_12px_32px_rgba(0,0,0,0.55)]"
             >
-              <Sparkles className="w-3.5 h-3.5 text-[#67E5DF] shrink-0" />
+              <Sparkles className="w-3.5 h-3.5 text-[#F2F3F5] shrink-0" />
               <span>{statusToast}</span>
               <button
                 type="button"
                 aria-label="Đóng thông báo"
                 onClick={clearToast}
-                className="ml-1 text-[#95A5B3] hover:text-[#E9F0F5]"
+                className="ml-1 text-[#9A9EA4] hover:text-[#EDEEF0]"
               >
                 <X className="w-3.5 h-3.5" />
               </button>
@@ -63,9 +63,9 @@ export const StatusToast: React.FC = () => {
               animate={{ opacity: 1, y: 0 }}
               exit={{ opacity: 0 }}
               transition={{ duration: 0.14 }}
-              className="px-3 py-1 rounded-full bg-[#070A0F]/85 border border-[#2D3B49] text-[11px] font-mono text-[#67E5DF]"
+              className="px-3 py-1 rounded-full bg-[#0A0A0B]/85 border border-[#333438] text-[11px] font-mono text-[#F2F3F5]"
             >
-              {hoveredPart.label.vi} · <span className="text-[#95A5B3]">{hoveredPart.label.en}</span>
+              {hoveredPart.label.vi} · <span className="text-[#9A9EA4]">{hoveredPart.label.en}</span>
             </motion.div>
           )}
         </AnimatePresence>
@@ -79,17 +79,17 @@ export const StatusToast: React.FC = () => {
             animate={{ opacity: 1, y: 0 }}
             exit={{ opacity: 0, y: 12 }}
             data-testid="guided-tour-bar"
-            className="fixed bottom-28 left-1/2 -translate-x-1/2 z-30 flex items-center gap-3 px-4 py-2 rounded-2xl bg-[#0E141D]/95 backdrop-blur-xl border border-[#67E5DF]/50 shadow-2xl"
+            className="fixed bottom-28 left-1/2 -translate-x-1/2 z-30 flex items-center gap-3 px-4 py-2 rounded-lg bg-[#111113]/95 backdrop-blur-xl border border-[#F2F3F5]/50 shadow-2xl"
           >
-            <Compass className="w-4 h-4 text-[#67E5DF]" />
-            <span className="text-xs font-mono text-[#E9F0F5]">
+            <Compass className="w-4 h-4 text-[#F2F3F5]" />
+            <span className="text-xs font-mono text-[#EDEEF0]">
               Tour Cấu Trúc: Bước {tourStepIndex + 1}/8
             </span>
             <button
               type="button"
               data-testid="tour-next-button"
               onClick={nextGuidedTourStep}
-              className="min-h-[36px] px-3 py-1 rounded-lg bg-[#67E5DF] text-[#070A0F] text-xs font-semibold hover:bg-[#67E5DF]/90 transition-colors"
+              className="min-h-[36px] px-3 py-1 rounded-lg bg-[#F2F3F5] text-[#0A0A0B] text-xs font-semibold hover:bg-[#F2F3F5]/90 transition-colors"
             >
               Tiếp theo →
             </button>
@@ -97,7 +97,7 @@ export const StatusToast: React.FC = () => {
               type="button"
               data-testid="tour-stop-button"
               onClick={stopGuidedTour}
-              className="min-h-[36px] px-2.5 py-1 rounded-lg bg-[#17222E] text-[#95A5B3] hover:text-[#E9F0F5] text-xs transition-colors"
+              className="min-h-[36px] px-2.5 py-1 rounded-lg bg-[#1C1D20] text-[#9A9EA4] hover:text-[#EDEEF0] text-xs transition-colors"
             >
               Kết thúc
             </button>

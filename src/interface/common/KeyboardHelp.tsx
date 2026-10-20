@@ -92,16 +92,16 @@ export const KeyboardHelp: React.FC = () => {
       <div
         role="alert"
         data-testid="error-fallback-screen"
-        className="fixed inset-0 z-50 flex items-center justify-center bg-[#070A0F]/95 p-6"
+        className="fixed inset-0 z-50 flex items-center justify-center bg-[#0A0A0B]/95 p-6"
       >
-        <div className="max-w-md w-full rounded-2xl bg-[#0E141D] border border-[#FA8E91]/50 p-6 text-center shadow-2xl">
+        <div className="max-w-md w-full rounded-lg bg-[#111113] border border-[#FA8E91]/50 p-6 text-center shadow-2xl">
           <div className="w-12 h-12 rounded-full bg-[#FA8E91]/15 text-[#FA8E91] flex items-center justify-center mx-auto mb-4">
             <AlertTriangle className="w-6 h-6" />
           </div>
-          <h2 className="text-lg font-semibold text-[#E9F0F5] mb-2">
+          <h2 className="text-lg font-semibold text-[#EDEEF0] mb-2">
             Không thể khởi tạo cảnh 3D AERIS X-9
           </h2>
-          <p className="text-sm text-[#95A5B3] mb-5">
+          <p className="text-sm text-[#9A9EA4] mb-5">
             {errorReason ??
               'Tài nguyên mô hình GLB hoặc ngữ cảnh WebGL không khả dụng trên thiết bị này.'}
           </p>
@@ -109,7 +109,7 @@ export const KeyboardHelp: React.FC = () => {
             type="button"
             data-testid="error-retry-button"
             onClick={() => dispatch({ type: 'RETRY' })}
-            className="min-h-[44px] px-5 py-2.5 rounded-xl bg-[#67E5DF] text-[#070A0F] font-semibold text-xs uppercase tracking-wider inline-flex items-center gap-2 hover:bg-[#67E5DF]/90 transition-colors"
+            className="min-h-[44px] px-5 py-2.5 rounded-md bg-[#F2F3F5] text-[#0A0A0B] font-semibold text-xs uppercase tracking-wider inline-flex items-center gap-2 hover:bg-[#F2F3F5]/90 transition-colors"
           >
             <RefreshCw className="w-4 h-4" />
             <span>Thử tải lại mô hình</span>
@@ -127,13 +127,13 @@ export const KeyboardHelp: React.FC = () => {
       aria-modal="true"
       aria-labelledby="keyboard-help-title"
       data-testid="keyboard-help-modal"
-      className="fixed inset-0 z-50 flex items-center justify-center bg-[#070A0F]/80 backdrop-blur-md p-4"
+      className="fixed inset-0 z-50 flex items-center justify-center bg-[#0A0A0B]/80 backdrop-blur-md p-4"
     >
-      <div className="max-w-md w-full rounded-2xl bg-[#0E141D] border border-[#2D3B49] p-6 shadow-2xl">
+      <div className="max-w-md w-full rounded-lg bg-[#111113] border border-[#333438] p-6 shadow-2xl">
         <div className="flex items-center justify-between mb-4">
           <div className="flex items-center gap-2">
-            <Keyboard className="w-5 h-5 text-[#67E5DF]" />
-            <h2 id="keyboard-help-title" className="text-base font-semibold text-[#E9F0F5]">
+            <Keyboard className="w-5 h-5 text-[#F2F3F5]" />
+            <h2 id="keyboard-help-title" className="text-base font-semibold text-[#EDEEF0]">
               Phím tắt &amp; Điều khiển tương tác
             </h2>
           </div>
@@ -142,7 +142,7 @@ export const KeyboardHelp: React.FC = () => {
             data-testid="close-help-modal"
             aria-label="Đóng bảng phím tắt"
             onClick={() => setHelpOpen(false)}
-            className="min-h-[44px] min-w-[44px] flex items-center justify-center rounded-lg text-[#95A5B3] hover:text-[#E9F0F5]"
+            className="min-h-[44px] min-w-[44px] flex items-center justify-center rounded-lg text-[#9A9EA4] hover:text-[#EDEEF0]"
           >
             <X className="w-4 h-4" />
           </button>
@@ -163,10 +163,10 @@ export const KeyboardHelp: React.FC = () => {
           ].map((item) => (
             <div
               key={item.key}
-              className="flex items-center justify-between py-2 px-3 rounded-xl bg-[#070A0F]/70 border border-[#2D3B49]/60"
+              className="flex items-center justify-between py-2 px-3 rounded-md bg-[#0A0A0B]/70 border border-[#333438]/60"
             >
-              <span className="font-mono text-[#67E5DF] font-semibold">{item.key}</span>
-              <span className="text-[#95A5B3] text-right">{item.desc}</span>
+              <span className="font-mono text-[#F2F3F5] font-semibold">{item.key}</span>
+              <span className="text-[#9A9EA4] text-right">{item.desc}</span>
             </div>
           ))}
         </div>

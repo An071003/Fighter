@@ -25,11 +25,11 @@ export const QualityMenu: React.FC = () => {
         aria-expanded={open}
         aria-haspopup="menu"
         onClick={() => setOpen((v) => !v)}
-        className="min-h-[44px] min-w-[44px] px-3 py-2 rounded-xl bg-[#0E141D]/90 border border-[#2D3B49] hover:border-[#67E5DF]/50 text-xs font-medium text-[#E9F0F5] flex items-center gap-2 transition-colors"
+        className="min-h-[44px] min-w-[44px] px-3 py-2 rounded-md bg-[#111113]/90 border border-[#333438] hover:border-[#F2F3F5]/50 text-xs font-medium text-[#EDEEF0] flex items-center gap-2 transition-colors"
       >
-        <SlidersHorizontal className="w-3.5 h-3.5 text-[#67E5DF]" />
+        <SlidersHorizontal className="w-3.5 h-3.5 text-[#F2F3F5]" />
         <span className="hidden sm:inline">Đồ họa:</span>
-        <span className="font-mono uppercase text-[#67E5DF]">
+        <span className="font-mono uppercase text-[#F2F3F5]">
           {qualityTier === 'auto' ? `AUTO·${resolvedQuality}` : qualityTier}
         </span>
       </button>
@@ -38,10 +38,10 @@ export const QualityMenu: React.FC = () => {
         <div
           role="menu"
           aria-label="Tùy chỉnh chất lượng và chuyển động"
-          className="absolute right-0 mt-2 w-60 rounded-2xl bg-[#0E141D]/95 backdrop-blur-xl border border-[#2D3B49] p-3 shadow-2xl z-50"
+          className="absolute right-0 mt-2 w-60 rounded-lg bg-[#111113]/95 backdrop-blur-xl border border-[#333438] p-3 shadow-2xl z-50"
         >
-          <div className="text-[11px] font-mono uppercase tracking-wider text-[#95A5B3] mb-2 flex items-center gap-1.5">
-            <Gauge className="w-3.5 h-3.5 text-[#67E5DF]" />
+          <div className="text-[11px] font-mono uppercase tracking-wider text-[#9A9EA4] mb-2 flex items-center gap-1.5">
+            <Gauge className="w-3.5 h-3.5 text-[#F2F3F5]" />
             <span>Cấu hình kết xuất 3D</span>
           </div>
 
@@ -61,8 +61,8 @@ export const QualityMenu: React.FC = () => {
                   }}
                   className={`min-h-[40px] px-2.5 py-1.5 rounded-lg text-xs font-medium text-left transition-colors border ${
                     active
-                      ? 'bg-[#17222E] text-[#67E5DF] border-[#67E5DF]/60'
-                      : 'bg-[#070A0F]/60 text-[#E9F0F5] border-transparent hover:border-[#2D3B49]'
+                      ? 'bg-[#1C1D20] text-[#F2F3F5] border-[#F2F3F5]/60'
+                      : 'bg-[#0A0A0B]/60 text-[#EDEEF0] border-transparent hover:border-[#333438]'
                   }`}
                 >
                   {t.label}
@@ -71,7 +71,7 @@ export const QualityMenu: React.FC = () => {
             })}
           </div>
 
-          <div className="border-t border-[#2D3B49] pt-2.5">
+          <div className="border-t border-[#333438] pt-2.5">
             <button
               type="button"
               role="menuitemcheckbox"
@@ -82,12 +82,12 @@ export const QualityMenu: React.FC = () => {
               }}
               className={`w-full min-h-[44px] px-3 py-2 rounded-lg text-xs font-medium flex items-center justify-between border transition-colors ${
                 reducedMotion
-                  ? 'bg-[#17222E] text-[#67E5DF] border-[#67E5DF]/60'
-                  : 'bg-[#070A0F]/60 text-[#E9F0F5] border-[#2D3B49]'
+                  ? 'bg-[#1C1D20] text-[#F2F3F5] border-[#F2F3F5]/60'
+                  : 'bg-[#0A0A0B]/60 text-[#EDEEF0] border-[#333438]'
               }`}
             >
               <span className="flex items-center gap-2">
-                <EyeOff className="w-3.5 h-3.5 text-[#67E5DF]" />
+                <EyeOff className="w-3.5 h-3.5 text-[#F2F3F5]" />
                 <span>Giảm chuyển động</span>
               </span>
               <span className="font-mono text-[11px] uppercase">

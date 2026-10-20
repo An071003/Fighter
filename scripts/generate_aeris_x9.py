@@ -83,46 +83,57 @@ def make_pbr_material(
 
 
 def create_materials() -> dict[str, bpy.types.Material]:
+    # v5 reference palette: matte obsidian-black shell, graphite trims, machined alloy mechanics.
     return {
         "skin_primary": make_pbr_material(
-            "AX9_Mat_ObsidianTitanium", (0.065, 0.082, 0.110, 1.0), metallic=0.60, roughness=0.42
+            "AX9_Mat_MatteObsidian", (0.020, 0.021, 0.024, 1.0), metallic=0.35, roughness=0.50
         ),
         "skin_trim": make_pbr_material(
-            "AX9_Mat_SatinTitanium", (0.095, 0.120, 0.160, 1.0), metallic=0.64, roughness=0.38
+            "AX9_Mat_GraphiteTrim", (0.034, 0.036, 0.040, 1.0), metallic=0.40, roughness=0.44
         ),
         "carbon_stealth": make_pbr_material(
-            "AX9_Mat_CarbonComposite", (0.045, 0.056, 0.078, 1.0), metallic=0.48, roughness=0.48
+            "AX9_Mat_CarbonComposite", (0.013, 0.014, 0.016, 1.0), metallic=0.20, roughness=0.60
         ),
         "canopy_glass": make_pbr_material(
-            "AX9_Mat_CanopySapphire",
-            (0.05, 0.16, 0.24, 1.0),
-            metallic=0.15,
-            roughness=0.06,
-            emission_color=(0.03, 0.12, 0.20),
-            emission_strength=0.12,
-            alpha=0.72,
+            "AX9_Mat_CanopySmoked",
+            (0.020, 0.026, 0.032, 1.0),
+            metallic=0.30,
+            roughness=0.05,
+            alpha=0.55,
         ),
         "alloy_mech": make_pbr_material(
-            "AX9_Mat_MachinedAlloy", (0.52, 0.58, 0.65, 1.0), metallic=0.88, roughness=0.22
+            "AX9_Mat_MachinedAlloy", (0.30, 0.31, 0.33, 1.0), metallic=0.85, roughness=0.32
+        ),
+        "chrome": make_pbr_material(
+            "AX9_Mat_OleoChrome", (0.78, 0.79, 0.81, 1.0), metallic=1.0, roughness=0.12
         ),
         "nozzle_ceramic": make_pbr_material(
             "AX9_Mat_NozzleInconel",
-            (0.16, 0.14, 0.13, 1.0),
+            (0.10, 0.095, 0.09, 1.0),
             metallic=0.82,
             roughness=0.30,
             emission_color=(0.95, 0.48, 0.14),
-            emission_strength=0.22,
+            emission_strength=0.15,
         ),
         "tire_rubber": make_pbr_material(
-            "AX9_Mat_TireRubber", (0.035, 0.040, 0.048, 1.0), metallic=0.08, roughness=0.78
+            "AX9_Mat_TireRubber", (0.020, 0.020, 0.022, 1.0), metallic=0.05, roughness=0.86
+        ),
+        "cockpit_dark": make_pbr_material(
+            "AX9_Mat_CockpitTub", (0.030, 0.032, 0.035, 1.0), metallic=0.15, roughness=0.72
+        ),
+        "seat_cushion": make_pbr_material(
+            "AX9_Mat_SeatCushion", (0.055, 0.057, 0.060, 1.0), metallic=0.0, roughness=0.92
+        ),
+        "hazard": make_pbr_material(
+            "AX9_Mat_HazardAmber", (0.90, 0.55, 0.08, 1.0), metallic=0.1, roughness=0.5
         ),
         "emitter_cyan": make_pbr_material(
-            "AX9_Mat_EmitterCyan",
-            (0.39, 0.90, 0.88, 1.0),
-            metallic=0.2,
-            roughness=0.14,
-            emission_color=(0.39, 0.90, 0.88),
-            emission_strength=2.6,
+            "AX9_Mat_DisplayScreen",
+            (0.70, 0.82, 0.92, 1.0),
+            metallic=0.0,
+            roughness=0.2,
+            emission_color=(0.70, 0.82, 0.92),
+            emission_strength=1.6,
         ),
         "emitter_amber": make_pbr_material(
             "AX9_Mat_EmitterAmber",
@@ -132,6 +143,14 @@ def create_materials() -> dict[str, bpy.types.Material]:
             emission_color=(1.0, 0.62, 0.18),
             emission_strength=2.6,
         ),
+        "nav_red": make_pbr_material(
+            "AX9_Mat_NavRed", (1.0, 0.12, 0.10, 1.0), metallic=0.0, roughness=0.2,
+            emission_color=(1.0, 0.12, 0.10), emission_strength=3.0,
+        ),
+        "nav_green": make_pbr_material(
+            "AX9_Mat_NavGreen", (0.15, 1.0, 0.35, 1.0), metallic=0.0, roughness=0.2,
+            emission_color=(0.15, 1.0, 0.35), emission_strength=3.0,
+        ),
     }
 
 
@@ -139,7 +158,7 @@ def finalize_mesh_obj(
     name: str,
     bm: bmesh.types.BMesh,
     pivot_three: tuple[float, float, float],
-    mat: bpy.types.Material,
+    mat: "bpy.types.Material | list[bpy.types.Material]",
     bevel_width: float = 0.005,
     smooth_polys: bool = True,
 ) -> bpy.types.Object:
@@ -178,10 +197,10 @@ def finalize_mesh_obj(
         bpy.ops.object.modifier_apply(modifier=bev.name)
         obj.select_set(False)
 
-    if obj.data.materials:
-        obj.data.materials[0] = mat
-    else:
-        obj.data.materials.append(mat)
+    mat_list = mat if isinstance(mat, list) else [mat]
+    obj.data.materials.clear()
+    for m in mat_list:
+        obj.data.materials.append(m)
 
     return obj
 
@@ -191,24 +210,34 @@ def add_lofted_sections(
     stations: list[list[tuple[float, float, float]]],
     cap_start: bool = True,
     cap_end: bool = True,
-) -> None:
+    mat_index: int = 0,
+    closed_loop: bool = False,
+) -> list[list[bmesh.types.BMVert]]:
     rings: list[list[bmesh.types.BMVert]] = []
     for st in stations:
         ring = [bm.verts.new(t2b(*pt)) for pt in st]
         rings.append(ring)
 
+    faces = []
     n_pts = len(stations[0])
-    for i in range(len(rings) - 1):
-        r0 = rings[i]
-        r1 = rings[i + 1]
+    pairs = [(i, i + 1) for i in range(len(rings) - 1)]
+    if closed_loop:
+        pairs.append((len(rings) - 1, 0))
+    for i0, i1 in pairs:
+        r0 = rings[i0]
+        r1 = rings[i1]
         for j in range(n_pts):
             jn = (j + 1) % n_pts
-            bm.faces.new((r0[j], r0[jn], r1[jn], r1[j]))
+            faces.append(bm.faces.new((r0[j], r0[jn], r1[jn], r1[j])))
 
-    if cap_start and len(rings[0]) >= 3:
-        bm.faces.new(list(reversed(rings[0])))
-    if cap_end and len(rings[-1]) >= 3:
-        bm.faces.new(rings[-1])
+    if not closed_loop:
+        if cap_start and len(rings[0]) >= 3:
+            faces.append(bm.faces.new(list(reversed(rings[0]))))
+        if cap_end and len(rings[-1]) >= 3:
+            faces.append(bm.faces.new(rings[-1]))
+    for f in faces:
+        f.material_index = mat_index
+    return rings
 
 
 def add_box_strip(
@@ -219,6 +248,7 @@ def add_box_strip(
     y1: float,
     z0: float,
     z1: float,
+    mat_index: int = 0,
 ) -> None:
     xa, xb = min(x0, x1), max(x0, x1)
     ya, yb = min(y0, y1), max(y0, y1)
@@ -233,7 +263,101 @@ def add_box_strip(
         (v[0], v[1], v[5], v[4]), (v[2], v[3], v[7], v[6]),
         (v[1], v[2], v[6], v[5]), (v[3], v[0], v[4], v[7]),
     ]:
-        bm.faces.new(f)
+        bm.faces.new(f).material_index = mat_index
+
+
+def _axis_basis(d: Vector, width_hint: "Vector | None" = None) -> tuple[Vector, Vector]:
+    """Orthonormal (u, v) perpendicular to axis d (Three.js space). u follows width_hint if given."""
+    if width_hint is None:
+        width_hint = Vector((0.0, 1.0, 0.0)) if abs(d.y) < 0.9 else Vector((1.0, 0.0, 0.0))
+    u = (width_hint - d * width_hint.dot(d)).normalized()
+    v = d.cross(u).normalized()
+    return u, v
+
+
+def add_tube(
+    bm: bmesh.types.BMesh,
+    p0: tuple[float, float, float],
+    p1: tuple[float, float, float],
+    r0: float,
+    r1: "float | None" = None,
+    seg: int = 16,
+    cap: bool = True,
+    mat_index: int = 0,
+) -> list[list[bmesh.types.BMVert]]:
+    """Round tube / truncated cone between two points (Three.js coords)."""
+    a = Vector(p0)
+    b = Vector(p1)
+    d = (b - a).normalized()
+    u, v = _axis_basis(d)
+    rings = []
+    for c, r in ((a, r0), (b, r1 if r1 is not None else r0)):
+        ring = []
+        for k in range(seg):
+            t = k * (2.0 * math.pi / seg)
+            q = c + (u * math.cos(t) + v * math.sin(t)) * r
+            ring.append((q.x, q.y, q.z))
+        rings.append(ring)
+    return add_lofted_sections(bm, rings, cap, cap, mat_index)
+
+
+def chamfer_rect(hw: float, hh: float, ch: float) -> list[tuple[float, float]]:
+    ch = min(ch, hw * 0.45, hh * 0.45)
+    return [
+        (hw - ch, hh), (-hw + ch, hh), (-hw, hh - ch), (-hw, -hh + ch),
+        (-hw + ch, -hh), (hw - ch, -hh), (hw, -hh + ch), (hw, hh - ch),
+    ]
+
+
+def add_chamfer_prism(
+    bm: bmesh.types.BMesh,
+    p0: tuple[float, float, float],
+    p1: tuple[float, float, float],
+    hw: float,
+    hh: float,
+    ch: float = 0.01,
+    mat_index: int = 0,
+    width_axis: tuple[float, float, float] = (1.0, 0.0, 0.0),
+    hw_end: "float | None" = None,
+    hh_end: "float | None" = None,
+) -> None:
+    """Machined block with chamfered edges extruded from p0 to p1; width measured along width_axis."""
+    a = Vector(p0)
+    b = Vector(p1)
+    d = (b - a).normalized()
+    u, v = _axis_basis(d, Vector(width_axis))
+    rings = []
+    for c, w, h in ((a, hw, hh), (b, hw_end or hw, hh_end or hh)):
+        ring = []
+        for px, py in chamfer_rect(w, h, ch):
+            q = c + u * px + v * py
+            ring.append((q.x, q.y, q.z))
+        rings.append(ring)
+    add_lofted_sections(bm, rings, True, True, mat_index)
+
+
+def add_revolve(
+    bm: bmesh.types.BMesh,
+    center: tuple[float, float, float],
+    axis: tuple[float, float, float],
+    profile: list[tuple[float, float]],
+    seg: int = 32,
+    closed_profile: bool = True,
+    mat_index: int = 0,
+) -> None:
+    """Revolve a (radius, axial offset) profile around an axis through center."""
+    c = Vector(center)
+    d = Vector(axis).normalized()
+    u, v = _axis_basis(d)
+    stations = []
+    for r, ax in profile:
+        ring = []
+        for k in range(seg):
+            t = k * (2.0 * math.pi / seg)
+            q = c + d * ax + (u * math.cos(t) + v * math.sin(t)) * r
+            ring.append((q.x, q.y, q.z))
+        stations.append(ring)
+    add_lofted_sections(bm, stations, not closed_profile, not closed_profile, mat_index, closed_profile)
 
 
 # ==============================================================================
@@ -298,7 +422,7 @@ def chine_ring(z: float, scale_inset: float = 1.0) -> list[tuple[float, float, f
     top_y = mid_y + (top_y - mid_y) * scale_inset
     bot_y = mid_y + (bot_y - mid_y) * scale_inset
 
-    n_half = 6  # 6 segments top->chine, 6 segments chine->bottom => 24 points total
+    n_half = 12  # 12 segments top->chine, 12 segments chine->bottom => 48 points total
     right_pts: list[tuple[float, float, float]] = []
 
     # 1. Top center (k=0) -> Right chine (k=n_half)
@@ -358,7 +482,7 @@ def build_dorsal_arch_ring(z: float, extra_w: float = 0.0, extra_y: float = 0.0)
     peak_y = deck_center_y + dh + extra_y
 
     # Right side of arch from top-center (k=0) to right sill (k=5)
-    n_arch = 5
+    n_arch = 10
     right_arch: list[tuple[float, float, float]] = []
     for k in range(n_arch + 1):
         u = k / float(n_arch)
@@ -549,13 +673,273 @@ def build_canopy_frame(mats: dict) -> bpy.types.Object:
 
 
 def build_display_plate(mats: dict) -> bpy.types.Object:
+    """
+    Cockpit interior: ejection seat (bucket, cushions, headbox, side rails, firing handle),
+    angled instrument panel with 3 MFD screens, glare-shield coaming, HUD combiner,
+    side consoles with backlit strips, centre stick and throttle.
+    Material slots: 0 tub/structure, 1 screens, 2 cushions, 3 alloy, 4 hazard amber.
+    """
     bm = bmesh.new()
-    # Sleek cockpit HUD & ejection seat nested strictly inside the canopy arch
-    add_box_strip(bm, -0.16, 0.16, 0.36, 0.44, -2.82, -2.50)  # Glare-shield console
-    add_box_strip(bm, -0.09, 0.09, 0.44, 0.58, -2.68, -2.58)  # Holographic HUD combiner
-    add_box_strip(bm, -0.15, 0.15, 0.22, 0.30, -2.25, -1.80)  # Ejection seat pan
-    add_box_strip(bm, -0.13, 0.13, 0.30, 0.64, -1.90, -1.72)  # Ejection seat backrest
-    return finalize_mesh_obj("AX9__CANOPY__CENTER__DISPLAY_PLATE", bm, (0.0, 0.48, -2.30), mats["emitter_cyan"], 0.003, False)
+    TUB, SCREEN, CUSHION, ALLOY, HAZARD = 0, 1, 2, 3, 4
+
+    # --- Ejection seat ---
+    add_chamfer_prism(bm, (0.0, 0.26, -2.26), (0.0, 0.26, -1.84), 0.150, 0.040, 0.018, TUB)  # seat bucket
+    add_chamfer_prism(bm, (0.0, 0.315, -2.22), (0.0, 0.315, -1.88), 0.122, 0.016, 0.012, CUSHION)  # seat cushion
+    # Reclined backrest (leans aft ~18 deg) with separate back cushion
+    add_chamfer_prism(bm, (0.0, 0.30, -1.80), (0.0, 0.66, -1.69), 0.140, 0.032, 0.016, TUB,
+                      hw_end=0.125)
+    add_chamfer_prism(bm, (0.0, 0.33, -1.835), (0.0, 0.62, -1.745), 0.112, 0.012, 0.010, CUSHION,
+                      hw_end=0.100)
+    # Headbox with parachute pack bulge
+    add_chamfer_prism(bm, (0.0, 0.64, -1.71), (0.0, 0.76, -1.67), 0.120, 0.045, 0.020, TUB, hw_end=0.105)
+    add_chamfer_prism(bm, (0.0, 0.655, -1.755), (0.0, 0.735, -1.735), 0.085, 0.012, 0.008, CUSHION)
+    # Side rails & firing handle loop
+    for sx in (-1.0, 1.0):
+        add_tube(bm, (sx * 0.158, 0.30, -2.20), (sx * 0.150, 0.70, -1.70), 0.011, seg=10, mat_index=ALLOY)
+        add_tube(bm, (sx * 0.055, 0.30, -2.27), (sx * 0.055, 0.345, -2.30), 0.008, seg=8, mat_index=HAZARD)
+    add_tube(bm, (-0.058, 0.345, -2.30), (0.058, 0.345, -2.30), 0.009, seg=8, mat_index=HAZARD)
+
+    # --- Instrument panel tilted toward the pilot ---
+    add_chamfer_prism(bm, (0.0, 0.24, -2.58), (0.0, 0.43, -2.66), 0.215, 0.022, 0.012, TUB)
+    panel_dir = (Vector((0.0, 0.43, -2.66)) - Vector((0.0, 0.24, -2.58))).normalized()
+    pilot_n = panel_dir.cross(Vector((1.0, 0.0, 0.0))).normalized()
+    if pilot_n.z < 0:
+        pilot_n = -pilot_n
+    for sx in (-0.128, 0.0, 0.128):
+        c0 = Vector((sx, 0.265, -2.589)) + pilot_n * 0.024
+        c1 = Vector((sx, 0.395, -2.644)) + pilot_n * 0.024
+        add_chamfer_prism(bm, tuple(c0), tuple(c1), 0.052, 0.004, 0.003, SCREEN)
+    # Glare-shield coaming hood
+    add_chamfer_prism(bm, (0.0, 0.445, -2.80), (0.0, 0.445, -2.55), 0.205, 0.016, 0.012, TUB, hw_end=0.185)
+    # HUD combiner: frame posts + glass plate
+    for sx in (-0.07, 0.07):
+        add_tube(bm, (sx, 0.46, -2.66), (sx, 0.58, -2.62), 0.006, seg=8, mat_index=ALLOY)
+    add_chamfer_prism(bm, (0.0, 0.47, -2.655), (0.0, 0.575, -2.62), 0.064, 0.002, 0.001, SCREEN)
+
+    # --- Side consoles with backlit strips, throttle & centre stick ---
+    for sx in (-1.0, 1.0):
+        add_chamfer_prism(bm, (sx * 0.215, 0.27, -2.48), (sx * 0.215, 0.27, -1.90), 0.042, 0.030, 0.010, TUB)
+        for kz in (-2.40, -2.26, -2.12):
+            add_box_strip(bm, sx * 0.19, sx * 0.24, 0.301, 0.306, kz, kz + 0.07, SCREEN)
+    add_tube(bm, (-0.215, 0.30, -2.18), (-0.215, 0.37, -2.13), 0.010, seg=8, mat_index=ALLOY)  # throttle arm
+    add_chamfer_prism(bm, (-0.215, 0.37, -2.14), (-0.215, 0.37, -2.10), 0.020, 0.022, 0.008, TUB)  # throttle grip
+    add_tube(bm, (0.0, 0.23, -2.16), (0.0, 0.40, -2.19), 0.010, seg=10, mat_index=ALLOY)  # stick
+    add_tube(bm, (0.0, 0.38, -2.19), (0.0, 0.44, -2.20), 0.017, 0.014, seg=10, mat_index=TUB)  # grip
+    add_revolve(bm, (0.0, 0.235, -2.16), (0.0, 1.0, 0.0),
+                [(0.0, 0.0), (0.045, 0.0), (0.035, 0.03), (0.012, 0.035), (0.0, 0.035)],
+                seg=16, closed_profile=False, mat_index=TUB)  # stick boot
+
+    return finalize_mesh_obj(
+        "AX9__CANOPY__CENTER__DISPLAY_PLATE",
+        bm,
+        (0.0, 0.48, -2.30),
+        [mats["cockpit_dark"], mats["emitter_cyan"], mats["seat_cushion"], mats["alloy_mech"], mats["hazard"]],
+        0.0,
+        True,
+    )
+
+
+def _intake_section(side: int, z: float, scale: float) -> list[tuple[float, float, float]]:
+    """24-point superelliptical intake section that follows the chine envelope at station z."""
+    s = float(side)
+    hw_env, _, bot_y, chine_y = fuselage_envelope(z)
+    u = clamp01((z + 2.10) / 3.20)
+    swell = math.sin(math.pi * u)
+    x_in = 0.32
+    x_out = hw_env * (0.72 + 0.12 * swell)
+    y_top = chine_y - 0.02
+    y_bot = bot_y - 0.03 * swell
+    cx = s * (x_in + x_out) * 0.5
+    cy = (y_top + y_bot) * 0.5
+    a = (x_out - x_in) * 0.5 * scale
+    b = (y_top - y_bot) * 0.5 * scale
+    pts = []
+    n = 24
+    for k in range(n):
+        t = k * (2.0 * math.pi / n)
+        c, sn = math.cos(t), math.sin(t)
+        px = a * math.copysign(abs(c) ** 0.55, c)
+        py = b * math.copysign(abs(sn) ** 0.55, sn)
+        pts.append((cx + px, cy + py, z))
+    if side < 0:
+        pts = list(reversed(pts))
+    return pts
+
+
+def build_intake_shell(side: int, node_name: str, mats: dict) -> bpy.types.Object:
+    """
+    Hollow chine intake: rounded outer cowl, raked lip, inner S-duct liner ending on a dark
+    compressor face, plus a boundary-layer splitter plate standing off the fuselage wall.
+    Material slots: 0 cowl trim, 1 dark duct interior.
+    """
+    bm = bmesh.new()
+    s = float(side)
+    z_outer = [-2.10, -1.80, -1.40, -0.95, -0.50, 0.00, 0.55, 1.10]
+    outer = add_lofted_sections(bm, [_intake_section(side, z, 1.0) for z in z_outer], False, True, 0)
+    z_inner = [-2.06, -1.85, -1.60, -1.35]
+    inner_st = [_intake_section(side, z, 0.84 - 0.06 * i) for i, z in enumerate(z_inner)]
+    inner = add_lofted_sections(bm, inner_st, False, True, 1)
+    # Lip joining cowl to liner
+    n = len(outer[0])
+    for j in range(n):
+        jn = (j + 1) % n
+        bm.faces.new((outer[0][j], outer[0][jn], inner[0][jn], inner[0][j])).material_index = 0
+    # Boundary-layer splitter plate
+    add_chamfer_prism(bm, (s * 0.285, -0.15, -2.24), (s * 0.285, -0.15, -1.30), 0.006, 0.15, 0.004, 0,
+                      hh_end=0.13)
+    for zz in (-2.0, -1.6):
+        add_box_strip(bm, s * 0.29, s * 0.33, -0.17, -0.13, zz, zz + 0.05, 0)
+    return finalize_mesh_obj(node_name, bm, (s * 0.68, -0.16, -0.50), [mats["skin_trim"], mats["cockpit_dark"]], 0.0, True)
+
+
+def build_exhaust_ring(side: int, node_name: str, mats: dict) -> bpy.types.Object:
+    """16 serrated nozzle petals + inner liner, turbine face and afterburner flame-holder ring."""
+    bm = bmesh.new()
+    s = float(side)
+    xc = s * 0.50
+    yc = 0.02
+    n_petals = 16
+    for k in range(n_petals):
+        a0 = (k + 0.04) * (2.0 * math.pi / n_petals)
+        a1 = (k + 0.96) * (2.0 * math.pi / n_petals)
+        amid = (a0 + a1) * 0.5
+        r_base_out, r_base_in = 0.30, 0.25
+        r_tip_out, r_tip_in = 0.23, 0.18
+        pts = [
+            (xc + math.cos(a0) * r_base_in, yc + math.sin(a0) * r_base_in * 0.88, 3.65),
+            (xc + math.cos(a1) * r_base_in, yc + math.sin(a1) * r_base_in * 0.88, 3.65),
+            (xc + math.cos(a1) * r_base_out, yc + math.sin(a1) * r_base_out * 0.88, 3.65),
+            (xc + math.cos(a0) * r_base_out, yc + math.sin(a0) * r_base_out * 0.88, 3.65),
+            (xc + math.cos(a0) * r_tip_in, yc + math.sin(a0) * r_tip_in * 0.88, 4.44),
+            (xc + math.cos(a1) * r_tip_in, yc + math.sin(a1) * r_tip_in * 0.88, 4.44),
+            (xc + math.cos(amid) * r_tip_out, yc + math.sin(amid) * r_tip_out * 0.88, 4.55),
+            (xc + math.cos(a0) * r_tip_out, yc + math.sin(a0) * r_tip_out * 0.88, 4.44),
+        ]
+        v = [bm.verts.new(t2b(*p)) for p in pts]
+        bm.faces.new((v[0], v[3], v[2], v[1]))
+        bm.faces.new((v[4], v[5], v[6], v[7]))
+        bm.faces.new((v[3], v[7], v[6], v[2]))
+        bm.faces.new((v[0], v[1], v[5], v[4]))
+        bm.faces.new((v[1], v[2], v[6], v[5]))
+        bm.faces.new((v[3], v[0], v[4], v[7]))
+    # Inner liner, turbine face (cap at the forward end) and flame-holder torus
+    add_tube(bm, (xc, yc, 3.58), (xc, yc, 4.30), 0.205, 0.17, seg=24, cap=False, mat_index=1)
+    add_revolve(bm, (xc, yc, 3.60), (0.0, 0.0, 1.0),
+                [(0.0, 0.0), (0.205, 0.0), (0.06, -0.06), (0.0, -0.07)], seg=24, closed_profile=False, mat_index=1)
+    add_revolve(bm, (xc, yc, 3.78), (0.0, 0.0, 1.0),
+                [(0.10, -0.012), (0.125, -0.012), (0.125, 0.012), (0.10, 0.012)], seg=24, mat_index=0)
+    for k in range(6):
+        ang = k * (math.pi / 3.0)
+        add_tube(bm, (xc, yc, 3.78), (xc + math.cos(ang) * 0.11, yc + math.sin(ang) * 0.11, 3.78),
+                 0.007, seg=6, mat_index=0)
+    return finalize_mesh_obj(node_name, bm, (xc, yc, 4.10), [mats["nozzle_ceramic"], mats["cockpit_dark"]], 0.0, True)
+
+
+def build_tip_light(side: int, node_name: str, mats: dict) -> bpy.types.Object:
+    """Teardrop navigation-light lens on the winglet tip (red port / green starboard)."""
+    bm = bmesh.new()
+    s = float(side)
+    profile = [(0.0, 0.0), (0.020, 0.04), (0.034, 0.14), (0.034, 0.30), (0.022, 0.42), (0.0, 0.46)]
+    add_revolve(bm, (s * 4.90, 0.46, 1.90), (0.0, 0.0, 1.0),
+                [(r * 1.0, a) for r, a in profile], seg=16, closed_profile=False, mat_index=0)
+    return finalize_mesh_obj(node_name, bm, (s * 4.90, 0.46, 2.13),
+                             mats["nav_red"] if side < 0 else mats["nav_green"], 0.0, True)
+
+
+def build_gear_assembly(g_side, strut_piv, wheel_piv, door_box, w_rad, w_hw, mats, created_objects) -> None:
+    """
+    Articulated gear leg: oleo cylinder + chrome piston, collar, drag brace, torque-link scissor,
+    axle; treaded tyre; multi-spoke rim with brake disc; ribbed door with hinges.
+    """
+    px, py, pz = strut_piv
+    wx, wy, wz = wheel_piv
+    mid_y = (py + wy) * 0.52
+    ALLOY, CHROME = 0, 1
+
+    # --- Strut ---
+    bm_strut = bmesh.new()
+    add_tube(bm_strut, (px, py + 0.05, pz), (px, mid_y, pz), 0.050, seg=20, mat_index=ALLOY)          # oleo cylinder
+    add_tube(bm_strut, (px, mid_y + 0.03, pz), (px, mid_y - 0.03, pz), 0.060, seg=20, mat_index=ALLOY)  # gland collar
+    add_tube(bm_strut, (px, mid_y, pz), (px, wy + 0.03, pz), 0.032, seg=16, mat_index=CHROME)        # chrome piston
+    add_tube(bm_strut, (px, py + 0.02, pz - 0.30), (px, mid_y + 0.02, pz), 0.020, seg=10, mat_index=ALLOY)  # drag brace
+    add_tube(bm_strut, (px - 0.05, py + 0.02, pz - 0.30), (px + 0.05, py + 0.02, pz - 0.30), 0.022, seg=10, mat_index=ALLOY)
+    # Torque-link scissor on the aft face
+    knee = (px, (mid_y + wy) * 0.5, pz + 0.12)
+    add_chamfer_prism(bm_strut, (px, mid_y - 0.02, pz + 0.045), knee, 0.016, 0.007, 0.003, ALLOY,
+                      width_axis=(1.0, 0.0, 0.0))
+    add_chamfer_prism(bm_strut, knee, (px, wy + 0.06, pz + 0.040), 0.016, 0.007, 0.003, ALLOY,
+                      width_axis=(1.0, 0.0, 0.0))
+    add_tube(bm_strut, (px - 0.02, knee[1], knee[2]), (px + 0.02, knee[1], knee[2]), 0.012, seg=8, mat_index=CHROME)
+    # Axle / fork
+    if g_side == "FRONT":
+        for sx in (-1.0, 1.0):
+            add_chamfer_prism(bm_strut, (wx + sx * (w_hw + 0.025), wy + 0.09, wz),
+                              (wx + sx * (w_hw + 0.025), wy, wz), 0.010, 0.026, 0.006, ALLOY)
+        add_tube(bm_strut, (wx - w_hw - 0.04, wy + 0.10, wz), (wx + w_hw + 0.04, wy + 0.10, wz), 0.024, seg=12, mat_index=ALLOY)
+    add_tube(bm_strut, (wx - w_hw - 0.04, wy, wz), (wx + w_hw + 0.04, wy, wz), 0.020, seg=12, mat_index=CHROME)
+    s_name = f"AX9__GEAR__{g_side}__GEAR_STRUT_{g_side}"
+    obj_strut = finalize_mesh_obj(s_name, bm_strut, strut_piv, [mats["alloy_mech"], mats["chrome"]], 0.0, True)
+    created_objects[s_name] = obj_strut
+
+    # --- Treaded tyre (revolved closed profile with 3 circumferential grooves) ---
+    bm_wheel = bmesh.new()
+    R, H = w_rad, w_hw
+    half = [
+        (0.60 * R, 0.86 * H), (0.78 * R, 1.00 * H), (0.93 * R, 0.94 * H), (0.99 * R, 0.70 * H),
+        (1.00 * R, 0.52 * H), (0.965 * R, 0.48 * H), (0.965 * R, 0.38 * H), (1.00 * R, 0.34 * H),
+        (1.00 * R, 0.08 * H), (0.965 * R, 0.04 * H),
+    ]
+    prof = half + [(r, -a) for r, a in reversed(half)]
+    add_revolve(bm_wheel, wheel_piv, (1.0, 0.0, 0.0), prof, seg=40, closed_profile=True, mat_index=0)
+    w_name = f"AX9__GEAR__{g_side}__GEAR_WHEEL_{g_side}"
+    obj_wheel = finalize_mesh_obj(w_name, bm_wheel, wheel_piv, mats["tire_rubber"], 0.0, True)
+    created_objects[w_name] = obj_wheel
+
+    # --- Rim: dished wheel halves, 6 spokes, brake disc ---
+    bm_hub = bmesh.new()
+    rim_half = [(0.60 * R, 0.86 * H), (0.56 * R, 0.80 * H), (0.50 * R, 0.55 * H), (0.22 * R, 0.45 * H),
+                (0.16 * R, 0.62 * H), (0.0, 0.64 * H)]
+    add_revolve(bm_hub, wheel_piv, (1.0, 0.0, 0.0), rim_half, seg=28, closed_profile=False, mat_index=0)
+    add_revolve(bm_hub, wheel_piv, (1.0, 0.0, 0.0), [(r, -a) for r, a in rim_half], seg=28, closed_profile=False, mat_index=0)
+    for k in range(6):
+        ang = k * (math.pi / 3.0)
+        dy, dz = math.cos(ang), math.sin(ang)
+        add_chamfer_prism(bm_hub, (wx, wy + dy * 0.18 * R, wz + dz * 0.18 * R),
+                          (wx, wy + dy * 0.52 * R, wz + dz * 0.52 * R), 0.42 * H, 0.020 * R / 0.27, 0.004, 0)
+    add_revolve(bm_hub, wheel_piv, (1.0, 0.0, 0.0),
+                [(0.20 * R, -0.12 * H), (0.47 * R, -0.12 * H), (0.47 * R, 0.12 * H), (0.20 * R, 0.12 * H)],
+                seg=28, closed_profile=True, mat_index=1)
+    h_name = f"AX9__GEAR__{g_side}__GEAR_HUB_{g_side}"
+    obj_hub = finalize_mesh_obj(h_name, bm_hub, wheel_piv, [mats["alloy_mech"], mats["chrome"]], 0.0, True)
+    created_objects[h_name] = obj_hub
+
+    w_world = obj_wheel.matrix_world.copy()
+    obj_wheel.parent = obj_strut
+    obj_wheel.matrix_parent_inverse = Matrix.Identity(4)
+    obj_wheel.matrix_basis = obj_strut.matrix_world.inverted() @ w_world
+
+    h_world = obj_hub.matrix_world.copy()
+    obj_hub.parent = obj_wheel
+    obj_hub.matrix_parent_inverse = Matrix.Identity(4)
+    obj_hub.matrix_basis = obj_wheel.matrix_world.inverted() @ h_world
+
+    # --- Door: skin plate + inner stiffener ribs + hinge knuckles ---
+    dx0, dx1, dy0, dz0, dz1 = door_box
+    bm_door = bmesh.new()
+    cxd = (dx0 + dx1) * 0.5
+    hwd = abs(dx1 - dx0) * 0.5
+    add_chamfer_prism(bm_door, (cxd, dy0 - 0.005, dz0), (cxd, dy0 - 0.005, dz1), hwd, 0.010, 0.006, 0)
+    for f in (0.25, 0.5, 0.75):
+        xr = dx0 + (dx1 - dx0) * f
+        add_box_strip(bm_door, xr - 0.008, xr + 0.008, dy0 + 0.005, dy0 + 0.030, dz0 + 0.05, dz1 - 0.05, 0)
+    for zr in (dz0 + 0.06, dz1 - 0.06):
+        add_box_strip(bm_door, dx0 + 0.02, dx1 - 0.02, dy0 + 0.005, dy0 + 0.022, zr - 0.008, zr + 0.008, 0)
+    hinge_x = dx0 if g_side != "RIGHT" else dx1
+    for zr in (dz0 + 0.12, dz1 - 0.12):
+        add_tube(bm_door, (hinge_x, dy0 + 0.012, zr - 0.04), (hinge_x, dy0 + 0.012, zr + 0.04), 0.014, seg=10, mat_index=1)
+    d_name = f"AX9__GEAR__{g_side}__GEAR_DOOR_{g_side}"
+    door_piv = (dx0 if g_side != "RIGHT" else dx1, dy0, (dz0 + dz1) * 0.5)
+    created_objects[d_name] = finalize_mesh_obj(d_name, bm_door, door_piv, [mats["carbon_stealth"], mats["alloy_mech"]], 0.0, True)
 
 
 def build_wing(side: int, node_name: str, mats: dict) -> bpy.types.Object:
@@ -658,32 +1042,6 @@ def build_fin(side: int, node_name: str, mats: dict) -> bpy.types.Object:
     return finalize_mesh_obj(node_name, bm, (s * 0.98, 1.04, 3.15), mats["skin_primary"], 0.0, True)
 
 
-def build_intake_shell(side: int, node_name: str, mats: dict) -> bpy.types.Object:
-    bm = bmesh.new()
-    s = float(side)
-    # Conformal lower-chine intake tunnel (-2.10m to +1.10m) tucked inside the fuselage chine width
-    z_list = [-2.10, -1.40, -0.60, 0.25, 1.10]
-    stations = []
-    for z in z_list:
-        hw, _, bot_y, chine_y = fuselage_envelope(z)
-        u = (z + 2.10) / 3.20
-        swell = math.sin(math.pi * u)
-        x_in = s * 0.32
-        x_out = s * (hw * (0.72 + 0.12 * swell))
-        y_top = chine_y - 0.02
-        y_bot = bot_y - 0.03 * swell
-        stations.append([
-            (x_in, y_top, z),
-            (x_out, y_top - 0.02, z),
-            (x_out * 0.92, y_bot + 0.03, z),
-            (x_in, y_bot, z),
-        ])
-    if side < 0:
-        stations = [list(reversed(st)) for st in stations]
-    add_lofted_sections(bm, stations)
-    return finalize_mesh_obj(node_name, bm, (s * 0.68, -0.16, -0.50), mats["skin_trim"], 0.0, True)
-
-
 def build_rear_shroud(side: int, node_name: str, mats: dict) -> bpy.types.Object:
     bm = bmesh.new()
     s = float(side)
@@ -706,39 +1064,6 @@ def build_rear_shroud(side: int, node_name: str, mats: dict) -> bpy.types.Object
         stations.append(ring)
     add_lofted_sections(bm, stations)
     return finalize_mesh_obj(node_name, bm, (xc, yc, 2.40), mats["carbon_stealth"], 0.0, True)
-
-
-def build_exhaust_ring(side: int, node_name: str, mats: dict) -> bpy.types.Object:
-    bm = bmesh.new()
-    s = float(side)
-    xc = s * 0.50
-    yc = 0.02
-    # 16 individual serrated thrust-vectoring nozzle petals (+3.65m to +4.55m)
-    n_petals = 16
-    for k in range(n_petals):
-        a0 = (k + 0.04) * (2.0 * math.pi / n_petals)
-        a1 = (k + 0.96) * (2.0 * math.pi / n_petals)
-        amid = (a0 + a1) * 0.5
-        r_base_out, r_base_in = 0.30, 0.25
-        r_tip_out, r_tip_in = 0.23, 0.18
-        pts = [
-            (xc + math.cos(a0) * r_base_in, yc + math.sin(a0) * r_base_in * 0.88, 3.65),
-            (xc + math.cos(a1) * r_base_in, yc + math.sin(a1) * r_base_in * 0.88, 3.65),
-            (xc + math.cos(a1) * r_base_out, yc + math.sin(a1) * r_base_out * 0.88, 3.65),
-            (xc + math.cos(a0) * r_base_out, yc + math.sin(a0) * r_base_out * 0.88, 3.65),
-            (xc + math.cos(a0) * r_tip_in, yc + math.sin(a0) * r_tip_in * 0.88, 4.44),
-            (xc + math.cos(a1) * r_tip_in, yc + math.sin(a1) * r_tip_in * 0.88, 4.44),
-            (xc + math.cos(amid) * r_tip_out, yc + math.sin(amid) * r_tip_out * 0.88, 4.55),
-            (xc + math.cos(a0) * r_tip_out, yc + math.sin(a0) * r_tip_out * 0.88, 4.44),
-        ]
-        v = [bm.verts.new(t2b(*p)) for p in pts]
-        bm.faces.new((v[0], v[3], v[2], v[1]))
-        bm.faces.new((v[4], v[5], v[6], v[7]))
-        bm.faces.new((v[3], v[7], v[6], v[2]))
-        bm.faces.new((v[0], v[1], v[5], v[4]))
-        bm.faces.new((v[1], v[2], v[6], v[5]))
-        bm.faces.new((v[3], v[0], v[4], v[7]))
-    return finalize_mesh_obj(node_name, bm, (xc, yc, 4.10), mats["nozzle_ceramic"], 0.002, False)
 
 
 def build_conformal_service_panel(
@@ -838,16 +1163,8 @@ def generate_aircraft() -> None:
             sgn, f"AX9__DUCT__{side_name}__EXHAUST_RING_{side_name}", mats
         )
 
-        # Wingtip navigation & telemetry light housing (flush on upturned winglet tip)
-        bm_light = bmesh.new()
-        add_box_strip(bm_light, sgn * 4.86, sgn * 4.94, 0.42, 0.50, 1.90, 2.36)
-        created_objects[f"AX9__LIGHT__{side_name}__TIP_LIGHT_{side_name}"] = finalize_mesh_obj(
-            f"AX9__LIGHT__{side_name}__TIP_LIGHT_{side_name}",
-            bm_light,
-            (sgn * 4.90, 0.46, 2.13),
-            mats["emitter_amber"] if sgn < 0 else mats["emitter_cyan"],
-            0.002,
-            False,
+        created_objects[f"AX9__LIGHT__{side_name}__TIP_LIGHT_{side_name}"] = build_tip_light(
+            sgn, f"AX9__LIGHT__{side_name}__TIP_LIGHT_{side_name}", mats
         )
 
     # 4. THREE ARTICULATED LANDING GEAR ASSEMBLIES (12 parts)
@@ -858,65 +1175,7 @@ def generate_aircraft() -> None:
     ]
 
     for g_side, strut_piv, wheel_piv, door_box, w_rad, w_hw in gear_specs:
-        bm_strut = bmesh.new()
-        px, py, pz = strut_piv
-        wx, wy, wz = wheel_piv
-        mid_y = (py + wy) * 0.52
-        add_box_strip(bm_strut, px - 0.042, px + 0.042, mid_y, py + 0.04, pz - 0.042, pz + 0.042)
-        add_box_strip(bm_strut, wx - 0.032, wx + 0.032, wy - 0.02, mid_y + 0.04, wz - 0.032, wz + 0.032)
-        add_box_strip(bm_strut, wx - 0.022, wx + 0.022, mid_y - 0.05, mid_y + 0.08, wz + 0.035, wz + 0.14)
-        add_box_strip(bm_strut, wx - 0.022, wx + 0.022, wy + 0.04, mid_y - 0.02, wz + 0.035, wz + 0.14)
-        add_box_strip(bm_strut, wx - 0.085, wx + 0.085, wy - 0.032, wy + 0.032, wz - 0.032, wz + 0.032)
-        s_name = f"AX9__GEAR__{g_side}__GEAR_STRUT_{g_side}"
-        obj_strut = finalize_mesh_obj(s_name, bm_strut, strut_piv, mats["alloy_mech"], 0.004, False)
-        created_objects[s_name] = obj_strut
-
-        bm_wheel = bmesh.new()
-        x_steps = [wx - w_hw, wx - w_hw * 0.65, wx, wx + w_hw * 0.65, wx + w_hw]
-        r_steps = [w_rad * 0.82, w_rad, w_rad * 1.02, w_rad, w_rad * 0.82]
-        w_stations = []
-        for x_s, r_s in zip(x_steps, r_steps):
-            ring = []
-            for k in range(24):
-                ang = k * (2.0 * math.pi / 24.0)
-                ring.append((x_s, wy + math.cos(ang) * r_s, wz + math.sin(ang) * r_s))
-            w_stations.append(ring)
-        add_lofted_sections(bm_wheel, w_stations)
-        w_name = f"AX9__GEAR__{g_side}__GEAR_WHEEL_{g_side}"
-        obj_wheel = finalize_mesh_obj(w_name, bm_wheel, wheel_piv, mats["tire_rubber"], 0.0, True)
-        created_objects[w_name] = obj_wheel
-
-        bm_hub = bmesh.new()
-        h_rad = w_rad * 0.52
-        h_hw = w_hw * 1.06
-        h_stations = []
-        for x_s in (wx - h_hw, wx + h_hw):
-            ring = []
-            for k in range(16):
-                ang = k * (2.0 * math.pi / 16.0)
-                ring.append((x_s, wy + math.cos(ang) * h_rad, wz + math.sin(ang) * h_rad))
-            h_stations.append(ring)
-        add_lofted_sections(bm_hub, h_stations)
-        h_name = f"AX9__GEAR__{g_side}__GEAR_HUB_{g_side}"
-        obj_hub = finalize_mesh_obj(h_name, bm_hub, wheel_piv, mats["alloy_mech"], 0.003, False)
-        created_objects[h_name] = obj_hub
-
-        w_world = obj_wheel.matrix_world.copy()
-        obj_wheel.parent = obj_strut
-        obj_wheel.matrix_parent_inverse = Matrix.Identity(4)
-        obj_wheel.matrix_basis = obj_strut.matrix_world.inverted() @ w_world
-
-        h_world = obj_hub.matrix_world.copy()
-        obj_hub.parent = obj_wheel
-        obj_hub.matrix_parent_inverse = Matrix.Identity(4)
-        obj_hub.matrix_basis = obj_wheel.matrix_world.inverted() @ h_world
-
-        dx0, dx1, dy0, dz0, dz1 = door_box
-        bm_door = bmesh.new()
-        add_box_strip(bm_door, dx0, dx1, dy0 - 0.016, dy0 + 0.006, dz0, dz1)
-        d_name = f"AX9__GEAR__{g_side}__GEAR_DOOR_{g_side}"
-        door_piv = (dx0 if g_side != "RIGHT" else dx1, dy0, (dz0 + dz1) * 0.5)
-        created_objects[d_name] = finalize_mesh_obj(d_name, bm_door, door_piv, mats["carbon_stealth"], 0.003, False)
+        build_gear_assembly(g_side, strut_piv, wheel_piv, door_box, w_rad, w_hw, mats, created_objects)
 
     # 5. FLUSH CONFORMAL EXTERIOR SERVICE PANELS (8 parts: strictly in z = -1.95 .. +0.75 ahead of nacelles)
     panel_z_ranges = [
@@ -959,7 +1218,7 @@ def generate_aircraft() -> None:
     glb_size = os.path.getsize(OUTPUT_GLB_PATH)
     report = {
         "status": "PASS",
-        "generator": "Blender 4.5 Headless Precision CAD & Conformal Stealth Generator (v4 Multi-Angle Verified)",
+        "generator": "Blender 4.5 Headless Precision CAD & Conformal Stealth Generator (v5 Detailed Mechanics & Reference Palette)",
         "outputGlb": "public/assets/aircraft/aeris-x9.glb",
         "fileSizeBytes": glb_size,
         "expectedContractNodes": len(expected_nodes),
@@ -976,7 +1235,7 @@ def generate_aircraft() -> None:
         json.dump(report, rf, indent=2)
 
     print(
-        f"[AERIS X-9 U1 v4] Exported {len(created_objects)}/46 nodes, "
+        f"[AERIS X-9 v5] Exported {len(created_objects)}/46 nodes, "
         f"{total_tris} triangles, {glb_size} bytes -> {OUTPUT_GLB_PATH}"
     )
 

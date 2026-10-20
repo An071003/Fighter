@@ -1,6 +1,7 @@
 import React, { useEffect } from 'react';
 import { useFrame } from '@react-three/fiber';
 import {
+  EXPLODE_LIFT_Y,
   FLIGHT_DURATION_SECONDS,
   RETURN_DURATION_SECONDS,
   TURNTABLE_DEG_PER_SEC,
@@ -143,7 +144,9 @@ export const FlightDirector: React.FC = () => {
     }
 
     if (jetVisualRigRef.current) {
-      jetVisualRigRef.current.position.set(0, frame.jetY, 0);
+      // Exploded view floats the assembly above the turntable (rest frame only, never in flight).
+      const explodeLift = EXPLODE_LIFT_Y * visualClockRef.explodeAnimatedProgress01;
+      jetVisualRigRef.current.position.set(0, frame.jetY + explodeLift, 0);
       jetVisualRigRef.current.rotation.set(
         frame.pitchDeg * DEG2RAD,
         visualClockRef.turntableAngleRad,

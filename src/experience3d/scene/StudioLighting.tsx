@@ -19,7 +19,7 @@ export const StudioLighting: React.FC = () => {
     if (rimLightRef.current) {
       // Boost rim intensity 15% during explode or flight hover for crisp silhouette separation
       rimLightRef.current.intensity =
-        2.4 + 0.35 * explodeProgress + 0.45 * frame.windIntensity;
+        2.4 + 0.5 * explodeProgress + 0.45 * frame.windIntensity;
     }
     if (shadowGroupRef.current) {
       shadowGroupRef.current.visible = frame.platformOpacity > 0.05;
@@ -29,13 +29,13 @@ export const StudioLighting: React.FC = () => {
   return (
     <group name="StudioLightingRig">
       {/* Base Ambient Fill */}
-      <ambientLight intensity={0.45} color="#B8CBE0" />
+      <ambientLight intensity={0.32} color="#D8DCE2" />
 
       {/* 1. Cool Key Light (Upper-Left Front) */}
       <directionalLight
         position={[7.5, 11.0, -8.5]}
-        intensity={3.1}
-        color="#E6F2FF"
+        intensity={2.6}
+        color="#F4F6F8"
         castShadow={qualityCfg.enableShadows}
         shadow-mapSize={[qualityCfg.shadowMapSize, qualityCfg.shadowMapSize]}
         shadow-camera-near={1}
@@ -50,8 +50,8 @@ export const StudioLighting: React.FC = () => {
       {/* 2. Warm Low Fill Light (Right Side) */}
       <directionalLight
         position={[-9.0, 3.2, -3.5]}
-        intensity={1.35}
-        color="#FFDAB8"
+        intensity={0.9}
+        color="#FFE6CC"
       />
 
       {/* 3. Crisp Cyan-White Back Rim Light */}
@@ -59,25 +59,25 @@ export const StudioLighting: React.FC = () => {
         ref={rimLightRef}
         position={[0.0, 6.5, 10.5]}
         intensity={2.4}
-        color="#8CEEEB"
+        color="#FFFFFF"
       />
 
       {/* Under-Belly Technical Fill so Landing Gear & Doors are Clearly Legible */}
       <pointLight
         position={[0, -2.2, -0.5]}
-        intensity={1.8}
+        intensity={1.1}
         distance={9}
-        color="#67E5DF"
+        color="#C9CED6"
       />
 
       {/* Self-Contained Procedural Studio Reflection Environment (100% Offline Safe) */}
       <Environment resolution={resolvedQuality === 'low' ? 128 : 256} frames={1}>
-        <color attach="background" args={['#070A0F']} />
+        <color attach="background" args={['#0A0A0B']} />
         {/* Overhead Softbox Strip */}
         <Lightformer
           form="rect"
-          intensity={3.2}
-          color="#E9F4FF"
+          intensity={2.4}
+          color="#FFFFFF"
           position={[0, 8, 0]}
           rotation={[Math.PI / 2, 0, 0]}
           scale={[14, 4, 1]}
@@ -85,8 +85,8 @@ export const StudioLighting: React.FC = () => {
         {/* Left Cool Key Reflection Strip */}
         <Lightformer
           form="rect"
-          intensity={2.4}
-          color="#9ADDFB"
+          intensity={1.6}
+          color="#E8ECF0"
           position={[9, 3, -4]}
           rotation={[0, -Math.PI / 2.4, 0]}
           scale={[10, 2.2, 1]}
@@ -94,8 +94,8 @@ export const StudioLighting: React.FC = () => {
         {/* Right Warm Metallic Highlight Strip */}
         <Lightformer
           form="rect"
-          intensity={1.7}
-          color="#FFD6A5"
+          intensity={1.0}
+          color="#FFE2C2"
           position={[-9, 2.5, 2]}
           rotation={[0, Math.PI / 2.2, 0]}
           scale={[10, 1.8, 1]}
@@ -103,8 +103,8 @@ export const StudioLighting: React.FC = () => {
         {/* Rear Rim Accent Strip */}
         <Lightformer
           form="ring"
-          intensity={2.2}
-          color="#67E5DF"
+          intensity={1.4}
+          color="#FFFFFF"
           position={[0, 4, 10]}
           scale={[6, 6, 1]}
         />
@@ -119,7 +119,7 @@ export const StudioLighting: React.FC = () => {
             blur={2.1}
             far={4.5}
             resolution={resolvedQuality === 'high' ? 512 : 256}
-            color="#020509"
+            color="#000000"
           />
         </group>
       )}

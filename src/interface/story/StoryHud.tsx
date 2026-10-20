@@ -48,10 +48,10 @@ const StoryMetricReadout: React.FC<{ metric: StoryMetric; reducedMotion: boolean
 
   return (
     <div data-testid="story-metric" className="select-none">
-      <div className="font-mono text-[10px] sm:text-[11px] tracking-[0.18em] text-[#95A5B3] uppercase">
+      <div className="font-mono text-[10px] sm:text-[11px] tracking-[0.18em] text-[#9A9EA4] uppercase">
         {metric.label}
       </div>
-      <div className="flex items-baseline gap-1.5 text-[#F2F6FA]">
+      <div className="flex items-baseline gap-1.5 text-[#F4F5F6]">
         <span
           ref={valueRef}
           data-testid="story-metric-value"
@@ -59,7 +59,7 @@ const StoryMetricReadout: React.FC<{ metric: StoryMetric; reducedMotion: boolean
         >
           {formatMetric(metric.value, metric.decimals)}
         </span>
-        <span className="font-mono text-base sm:text-xl text-[#C9D4DE]">{metric.unit}</span>
+        <span className="font-mono text-base sm:text-xl text-[#C8CACD]">{metric.unit}</span>
       </div>
     </div>
   );
@@ -140,7 +140,7 @@ const StoryCalloutOverlay: React.FC<{ phase: StoryPhase; phaseIndex: number }> =
             key={`line-${phase.id}`}
             ref={lineRef}
             fill="none"
-            stroke="#E9F0F5"
+            stroke="#EDEEF0"
             strokeOpacity={0.85}
             strokeWidth={1}
             initial={{ opacity: 0 }}
@@ -148,8 +148,8 @@ const StoryCalloutOverlay: React.FC<{ phase: StoryPhase; phaseIndex: number }> =
             transition={{ duration: 0.5, delay: 0.35 }}
           />
           <circle ref={ringRef} r={11} fill="none" stroke="#F5A623" strokeWidth={1.25} />
-          <circle ref={coreRef} r={3.5} fill="#F2F6FA" />
-          <circle ref={elbowRef} r={3} fill="#F2F6FA" />
+          <circle ref={coreRef} r={3.5} fill="#F4F5F6" />
+          <circle ref={elbowRef} r={3} fill="#F4F5F6" />
         </g>
       </svg>
 
@@ -170,20 +170,20 @@ const StoryCalloutOverlay: React.FC<{ phase: StoryPhase; phaseIndex: number }> =
           {/* Soft scrim so text stays legible over bright fuselage reflections */}
           <div
             aria-hidden="true"
-            className="absolute -inset-x-8 -inset-y-6 -z-10 bg-[radial-gradient(ellipse_at_center,rgba(7,10,15,0.78)_0%,rgba(7,10,15,0.5)_45%,transparent_72%)]"
+            className="absolute -inset-x-8 -inset-y-6 -z-10 bg-[radial-gradient(ellipse_at_center,rgba(10,10,11,0.78)_0%,rgba(10,10,11,0.5)_45%,transparent_72%)]"
           />
           <div
             className={`flex items-baseline gap-2 ${callout.side === 'left' ? 'justify-end' : ''}`}
           >
             <span className="font-mono text-xs text-[#F5A623]">{pad2(callout.index)}</span>
-            <span className="font-sans text-lg sm:text-[22px] font-semibold text-[#F2F6FA] leading-tight drop-shadow-[0_2px_12px_rgba(0,0,0,0.9)]">
+            <span className="font-sans text-lg sm:text-[22px] font-semibold text-[#F4F5F6] leading-tight drop-shadow-[0_2px_12px_rgba(0,0,0,0.9)]">
               {callout.title}
             </span>
           </div>
-          <p className="hidden sm:block mt-1.5 font-sans text-[13px] leading-snug text-[#C9D4DE] drop-shadow-[0_2px_10px_rgba(0,0,0,0.95)]">
+          <p className="hidden sm:block mt-1.5 font-sans text-[13px] leading-snug text-[#C8CACD] drop-shadow-[0_2px_10px_rgba(0,0,0,0.95)]">
             {callout.body}
           </p>
-          <div className="mt-1.5 font-mono text-[10px] sm:text-[11px] tracking-[0.14em] text-[#E9F0F5]">
+          <div className="mt-1.5 font-mono text-[10px] sm:text-[11px] tracking-[0.14em] text-[#EDEEF0]">
             {callout.status}
           </div>
         </motion.div>
@@ -220,21 +220,21 @@ const StripButton: React.FC<StripButtonProps> = ({
       accent
         ? 'border-[#F5A623]/80 bg-[#2B2112]/70 text-[#FFD08A]'
         : active
-          ? 'border-[#E9F0F5]/70 bg-[#1A222D] text-[#F2F6FA]'
-          : 'border-[#2A3542] bg-[#0E131A] text-[#AEBBC7] hover:border-[#95A5B3]/60 hover:text-[#E9F0F5]'
+          ? 'border-[#EDEEF0]/70 bg-[#1E1F22] text-[#F4F5F6]'
+          : 'border-[#2C2D30] bg-[#101012] text-[#AEB1B5] hover:border-[#9A9EA4]/60 hover:text-[#EDEEF0]'
     }`}
   >
     <kbd className="min-w-[20px] h-5 px-1 inline-flex items-center justify-center rounded border border-current/40 font-mono text-[10px] opacity-80">
       {hotkey}
     </kbd>
     <span className="whitespace-nowrap">{label}</span>
-    {hint && <span className="font-mono text-[10px] text-[#7D8B98] whitespace-nowrap">{hint}</span>}
+    {hint && <span className="font-mono text-[10px] text-[#7E8287] whitespace-nowrap">{hint}</span>}
   </button>
 );
 
 const StripRow: React.FC<{ title: string; children: React.ReactNode }> = ({ title, children }) => (
   <div className="flex items-center gap-3 min-w-0">
-    <span className="w-[72px] sm:w-[88px] shrink-0 font-mono text-[10px] tracking-[0.2em] text-[#7D8B98] uppercase">
+    <span className="w-[72px] sm:w-[88px] shrink-0 font-mono text-[10px] tracking-[0.2em] text-[#7E8287] uppercase">
       {title}
     </span>
     <div className="flex items-center gap-1.5 overflow-x-auto no-scrollbar min-w-0 py-0.5">{children}</div>
@@ -268,22 +268,22 @@ export const StoryHud: React.FC = () => {
       data-testid="story-hud"
       data-story-phase={phase.id}
       aria-label={`Hành trình bay, pha ${storyPhaseIndex + 1} trên ${STORY_PHASE_COUNT}: ${phase.label}`}
-      className="fixed inset-0 z-20 pointer-events-none text-[#E9F0F5]"
+      className="fixed inset-0 z-20 pointer-events-none text-[#EDEEF0]"
     >
       {/* Callout + leader line (screen space) */}
       <StoryCalloutOverlay phase={phase} phaseIndex={storyPhaseIndex} />
 
       {/* Thin figure frame */}
-      <div className="absolute left-3 right-3 top-3 sm:left-5 sm:right-5 sm:top-5 bottom-[170px] sm:bottom-[150px] border border-[#E9F0F5]/25 rounded-[2px]">
+      <div className="absolute left-3 right-3 top-3 sm:left-5 sm:right-5 sm:top-5 bottom-[170px] sm:bottom-[150px] border border-[#EDEEF0]/25 rounded-[2px]">
         <div className="absolute left-4 top-3 sm:left-5 sm:top-4 flex flex-col gap-3 sm:gap-5">
-          <span className="font-mono text-xs sm:text-sm text-[#E9F0F5]">
+          <span className="font-mono text-xs sm:text-sm text-[#EDEEF0]">
             {cutawayShown ? 'Fig 1 — cutaway' : 'Fig 1'}
           </span>
           <StoryMetricReadout metric={phase.metric} reducedMotion={reducedMotion} />
         </div>
 
         <div className="absolute right-3 top-3 sm:right-5 sm:top-4 flex items-center gap-3">
-          <span className="hidden sm:inline font-mono text-xs sm:text-sm tracking-[0.3em] text-[#C9D4DE]">
+          <span className="hidden sm:inline font-mono text-xs sm:text-sm tracking-[0.3em] text-[#C8CACD]">
             AERIS X-9 · CONCEPT
           </span>
           <button
@@ -292,7 +292,7 @@ export const StoryHud: React.FC = () => {
             onClick={() => dispatch({ type: 'STORY_EXIT' })}
             aria-label="Thoát hành trình bay (Esc)"
             title="Thoát hành trình bay (Esc)"
-            className="pointer-events-auto min-h-[36px] min-w-[36px] inline-flex items-center justify-center gap-1.5 px-2 rounded-md border border-[#2A3542] bg-[#0E131A]/80 text-[#AEBBC7] hover:text-[#F2F6FA] hover:border-[#95A5B3]/60 font-mono text-[11px]"
+            className="pointer-events-auto min-h-[36px] min-w-[36px] inline-flex items-center justify-center gap-1.5 px-2 rounded-md border border-[#2C2D30] bg-[#101012]/80 text-[#AEB1B5] hover:text-[#F4F5F6] hover:border-[#9A9EA4]/60 font-mono text-[11px]"
           >
             <X className="w-3.5 h-3.5" />
             <span className="hidden sm:inline">Esc</span>
@@ -305,13 +305,13 @@ export const StoryHud: React.FC = () => {
             aria-label="Pha trước"
             disabled={storyPhaseIndex === 0}
             onClick={() => dispatch({ type: 'STORY_PREV' })}
-            className="pointer-events-auto min-h-[32px] min-w-[32px] inline-flex items-center justify-center rounded border border-[#2A3542] bg-[#0E131A]/80 disabled:opacity-30"
+            className="pointer-events-auto min-h-[32px] min-w-[32px] inline-flex items-center justify-center rounded border border-[#2C2D30] bg-[#101012]/80 disabled:opacity-30"
           >
             <ChevronLeft className="w-4 h-4" />
           </button>
           <span
             data-testid="story-phase-label"
-            className="font-mono text-[11px] sm:text-xs tracking-[0.22em] text-[#C9D4DE] uppercase whitespace-nowrap"
+            className="font-mono text-[11px] sm:text-xs tracking-[0.22em] text-[#C8CACD] uppercase whitespace-nowrap"
           >
             Pha {pad2(storyPhaseIndex + 1)} / {pad2(STORY_PHASE_COUNT)} · {phase.label}
           </span>
@@ -320,7 +320,7 @@ export const StoryHud: React.FC = () => {
             aria-label="Pha tiếp theo"
             disabled={storyPhaseIndex >= STORY_PHASE_COUNT - 1}
             onClick={() => dispatch({ type: 'STORY_NEXT' })}
-            className="pointer-events-auto min-h-[32px] min-w-[32px] inline-flex items-center justify-center rounded border border-[#2A3542] bg-[#0E131A]/80 disabled:opacity-30"
+            className="pointer-events-auto min-h-[32px] min-w-[32px] inline-flex items-center justify-center rounded border border-[#2C2D30] bg-[#101012]/80 disabled:opacity-30"
           >
             <ChevronRight className="w-4 h-4" />
           </button>
@@ -328,7 +328,7 @@ export const StoryHud: React.FC = () => {
 
         <div
           data-testid="story-status-line"
-          className="hidden md:block absolute right-5 bottom-4 font-mono text-xs text-[#E9F0F5] whitespace-nowrap"
+          className="hidden md:block absolute right-5 bottom-4 font-mono text-xs text-[#EDEEF0] whitespace-nowrap"
         >
           {phase.statusLine}
         </div>

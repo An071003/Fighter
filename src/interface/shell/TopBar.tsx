@@ -49,23 +49,23 @@ export const TopBar: React.FC = () => {
       {/* Top Global Utility Header */}
       <header className="fixed top-0 inset-x-0 z-20 px-3 sm:px-6 py-2.5 flex items-center justify-between pointer-events-none">
         {/* Brand + Fig 1 Blueprint Tag + Mode Index */}
-        <div className="pointer-events-auto flex items-center gap-2 sm:gap-3 bg-[#0B0F17]/90 backdrop-blur-xl border border-[#263342] rounded-2xl px-3 sm:px-3.5 py-2 shadow-lg whitespace-nowrap">
-          <span className="font-mono text-[11px] font-semibold tracking-wider text-[#95A5B3] border-r border-[#263342] pr-2.5">
+        <div className="pointer-events-auto flex items-center gap-2 sm:gap-3 bg-[#0E0E10]/90 backdrop-blur-xl border border-[#2A2B2E] rounded-lg px-3 sm:px-3.5 py-2 shadow-lg whitespace-nowrap">
+          <span className="font-mono text-[11px] font-semibold tracking-wider text-[#9A9EA4] border-r border-[#2A2B2E] pr-2.5">
             {effectiveCutaway ? 'Fig 1 — cutaway' : 'Fig 1'}
           </span>
           <div className="flex items-center gap-2">
-            <span className="w-2 h-2 sm:w-2.5 sm:h-2.5 rounded-full bg-[#67E5DF] shadow-[0_0_10px_#67E5DF]" />
-            <span className="font-mono text-[11px] sm:text-xs font-bold tracking-widest uppercase text-[#E9F0F5]">
+            <span className="w-2 h-2 sm:w-2.5 sm:h-2.5 rounded-full bg-[#F2F3F5]" />
+            <span className="font-mono text-[11px] sm:text-xs font-bold tracking-widest uppercase text-[#EDEEF0]">
               AERIS X-9
             </span>
           </div>
-          <span className="hidden sm:inline text-[#263342]">|</span>
+          <span className="hidden sm:inline text-[#2A2B2E]">|</span>
           <div
             data-testid="active-mode-badge"
-            className="hidden sm:block font-mono text-[11px] uppercase tracking-wider text-[#67E5DF] whitespace-nowrap"
+            className="hidden sm:block font-mono text-[11px] uppercase tracking-wider text-[#F2F3F5] whitespace-nowrap"
           >
             <span>{modeBadge.code}</span>
-            <span className="text-[#E9F0F5]"> · {modeBadge.labelVi}</span>
+            <span className="text-[#EDEEF0]"> · {modeBadge.labelVi}</span>
           </div>
         </div>
 
@@ -77,13 +77,13 @@ export const TopBar: React.FC = () => {
             aria-pressed={effectiveCutaway}
             onClick={toggleCutaway}
             title="Chế độ Cutaway X-Ray: Làm trong suốt vỏ thân để quan sát cơ cấu càng đáp & khung sườn bên trong"
-            className={`min-h-[44px] px-3 py-2 rounded-xl border text-xs font-mono font-medium flex items-center gap-1.5 transition-colors ${
+            className={`min-h-[44px] px-3 py-2 rounded-md border text-xs font-mono font-medium flex items-center gap-1.5 transition-colors ${
               effectiveCutaway
-                ? 'bg-[#2B2112]/95 text-[#FFB84D] border-[#FFB84D]/70 shadow-[0_0_18px_rgba(245,166,35,0.25)]'
-                : 'bg-[#0B0F17]/90 text-[#E9F0F5] border-[#263342] hover:border-[#FFB84D]/50'
+                ? 'bg-[#2B2112]/95 text-[#F5A623] border-[#F5A623]/70'
+                : 'bg-[#0E0E10]/90 text-[#EDEEF0] border-[#2A2B2E] hover:border-[#F5A623]/50'
             }`}
           >
-            <Eye className="w-3.5 h-3.5 text-[#FFB84D]" />
+            <Eye className="w-3.5 h-3.5 text-[#F5A623]" />
             <span className="hidden sm:inline">Cutaway</span>
           </button>
 
@@ -98,13 +98,13 @@ export const TopBar: React.FC = () => {
                 ? 'Khóa danh mục bộ phận khi đang bay'
                 : 'Mở danh mục 46 bộ phận 3D'
             }
-            className={`min-h-[44px] px-3.5 py-2 rounded-xl border text-xs font-medium flex items-center gap-2 transition-colors ${
+            className={`min-h-[44px] px-3.5 py-2 rounded-md border text-xs font-medium flex items-center gap-2 transition-colors ${
               isPartsDrawerOpen
-                ? 'bg-[#17222E] text-[#67E5DF] border-[#67E5DF]/60'
-                : 'bg-[#0B0F17]/90 text-[#E9F0F5] border-[#263342] hover:border-[#67E5DF]/50 disabled:opacity-40 disabled:cursor-not-allowed'
+                ? 'bg-[#1C1D20] text-[#F2F3F5] border-[#F2F3F5]/60'
+                : 'bg-[#0E0E10]/90 text-[#EDEEF0] border-[#2A2B2E] hover:border-[#F2F3F5]/50 disabled:opacity-40 disabled:cursor-not-allowed'
             }`}
           >
-            <Layers className="w-3.5 h-3.5 text-[#67E5DF]" />
+            <Layers className="w-3.5 h-3.5 text-[#F2F3F5]" />
             <span className="hidden md:inline">46 Bộ phận</span>
           </button>
 
@@ -115,9 +115,9 @@ export const TopBar: React.FC = () => {
             data-testid="scene-reset"
             onClick={() => dispatch({ type: 'RESET_SCENE' })}
             title="Khôi phục toàn bộ cảnh về mặc định"
-            className="min-h-[44px] min-w-[44px] px-3 py-2 rounded-xl bg-[#0B0F17]/90 border border-[#263342] hover:border-[#67E5DF]/50 text-xs font-medium text-[#E9F0F5] flex items-center justify-center gap-1.5 transition-colors"
+            className="min-h-[44px] min-w-[44px] px-3 py-2 rounded-md bg-[#0E0E10]/90 border border-[#2A2B2E] hover:border-[#F2F3F5]/50 text-xs font-medium text-[#EDEEF0] flex items-center justify-center gap-1.5 transition-colors"
           >
-            <RotateCcw className="w-3.5 h-3.5 text-[#67E5DF]" />
+            <RotateCcw className="w-3.5 h-3.5 text-[#F2F3F5]" />
             <span className="hidden lg:inline">Khôi phục</span>
           </button>
 
@@ -126,9 +126,9 @@ export const TopBar: React.FC = () => {
             data-testid="help-toggle-button"
             aria-label="Mở hướng dẫn phím tắt"
             onClick={() => setHelpOpen(true)}
-            className="min-h-[44px] min-w-[44px] rounded-xl bg-[#0B0F17]/90 border border-[#263342] hover:border-[#67E5DF]/50 text-[#E9F0F5] flex items-center justify-center transition-colors"
+            className="min-h-[44px] min-w-[44px] rounded-md bg-[#0E0E10]/90 border border-[#2A2B2E] hover:border-[#F2F3F5]/50 text-[#EDEEF0] flex items-center justify-center transition-colors"
           >
-            <HelpCircle className="w-4 h-4 text-[#67E5DF]" />
+            <HelpCircle className="w-4 h-4 text-[#F2F3F5]" />
           </button>
         </div>
       </header>
@@ -141,76 +141,76 @@ export const TopBar: React.FC = () => {
         aria-label="Giới thiệu tiêm kích concept AERIS X-9"
         className="fixed top-16 sm:top-20 left-3 sm:left-6 z-10 max-w-[280px] sm:max-w-[320px] pointer-events-none select-none"
       >
-        <div className="font-eyebrow text-[#67E5DF] mb-1 flex items-center gap-2">
+        <div className="font-eyebrow text-[#F2F3F5] mb-1 flex items-center gap-2">
           <span>SIMULATIONS &amp; DYNAMICS</span>
           {assetAudit?.isHighFidelity && (
-            <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full bg-[#141E2B]/90 border border-[#67E5DF]/30 text-[10px] text-[#9EE4BE]">
+            <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full bg-[#18191B]/90 border border-[#F2F3F5]/30 text-[10px] text-[#C8CACD]">
               <ShieldCheck className="w-3 h-3" />
               46 MESHES
             </span>
           )}
         </div>
 
-        <h1 className="font-display-hero text-[#E9F0F5] tracking-tight mb-1.5 whitespace-nowrap drop-shadow-[0_6px_28px_rgba(0,0,0,0.85)]">
+        <h1 className="font-display-hero text-[#EDEEF0] tracking-tight mb-1.5 whitespace-nowrap drop-shadow-[0_6px_28px_rgba(0,0,0,0.85)]">
           AERIS X-9
         </h1>
 
-        <p className="hidden sm:block font-body text-xs text-[#95A5B3] max-w-[34ch] mb-3 drop-shadow">
+        <p className="hidden sm:block font-body text-xs text-[#9A9EA4] max-w-[34ch] mb-3 drop-shadow">
           Trình diễn kết cấu tiêm kích concept tương lai phi vũ trang: xoay 360° trên bàn xoay,
           bóc tách 46 phân cụm cơ khí và biến hình bay tại chỗ.
         </p>
 
         {/* Live Big Monospace Telemetry Readout (Reference Video Style: N1 % / Airspeed kt / Altitude ft) */}
-        <div className="hidden sm:flex items-baseline gap-4 mb-2.5 px-3 py-2 rounded-xl bg-[#0B0F17]/82 backdrop-blur-md border border-[#263342]/80 font-mono">
+        <div className="hidden sm:flex items-baseline gap-4 mb-2.5 px-3 py-2 rounded-md bg-[#0E0E10]/82 backdrop-blur-md border border-[#2A2B2E]/80 font-mono">
           <div>
-            <span className="text-[9px] uppercase tracking-wider text-[#95A5B3] block">
+            <span className="text-[9px] uppercase tracking-wider text-[#9A9EA4] block">
               {isFlightActive && altitudeFt > 100 ? 'ALTITUDE' : 'N1 • TWIN FAN'}
             </span>
-            <span className="text-xl font-bold text-[#E9F0F5] tracking-tight">
+            <span className="text-xl font-bold text-[#EDEEF0] tracking-tight">
               {isFlightActive && altitudeFt > 100
                 ? `${altitudeFt.toLocaleString('en-US')} ft`
                 : `${n1Pct.toFixed(1)} %`}
             </span>
           </div>
-          <div className="border-l border-[#263342] pl-3">
-            <span className="text-[9px] uppercase tracking-wider text-[#95A5B3] block">
+          <div className="border-l border-[#2A2B2E] pl-3">
+            <span className="text-[9px] uppercase tracking-wider text-[#9A9EA4] block">
               AIRSPEED
             </span>
-            <span className="text-sm font-semibold text-[#FFB84D]">
+            <span className="text-sm font-semibold text-[#F5A623]">
               {airspeedKt} kt
             </span>
           </div>
-          <div className="border-l border-[#263342] pl-3">
-            <span className="text-[9px] uppercase tracking-wider text-[#95A5B3] block">
+          <div className="border-l border-[#2A2B2E] pl-3">
+            <span className="text-[9px] uppercase tracking-wider text-[#9A9EA4] block">
               GEAR
             </span>
-            <span className="text-xs font-semibold text-[#67E5DF]">
+            <span className="text-xs font-semibold text-[#F2F3F5]">
               {isFlightActive && flightElapsedUi > 4.2 ? 'UP' : 'DOWN'}
             </span>
           </div>
         </div>
 
         {/* Honest Visual State Metadata Grid */}
-        <div className="hidden md:grid grid-cols-2 gap-2 p-2.5 rounded-2xl bg-[#0B0F17]/80 backdrop-blur-md border border-[#263342]/80 text-[11px] font-mono">
+        <div className="hidden md:grid grid-cols-2 gap-2 p-2.5 rounded-lg bg-[#0E0E10]/80 backdrop-blur-md border border-[#2A2B2E]/80 text-[11px] font-mono">
           <div>
-            <span className="text-[#95A5B3] block text-[10px]">TRẠNG THÁI</span>
-            <span className="text-[#E9F0F5] font-semibold">{modeBadge.labelVi}</span>
+            <span className="text-[#9A9EA4] block text-[10px]">TRẠNG THÁI</span>
+            <span className="text-[#EDEEF0] font-semibold">{modeBadge.labelVi}</span>
           </div>
           <div>
-            <span className="text-[#95A5B3] block text-[10px]">ĐỘ BÓC TÁCH</span>
-            <span className="text-[#67E5DF] font-semibold" data-testid="hud-explode-pct">
+            <span className="text-[#9A9EA4] block text-[10px]">ĐỘ BÓC TÁCH</span>
+            <span className="text-[#F2F3F5] font-semibold" data-testid="hud-explode-pct">
               {explodePct}% ({explodePct === 0 ? 'Nguyên khối' : 'Tách lớp'})
             </span>
           </div>
           <div>
-            <span className="text-[#95A5B3] block text-[10px]">PHA ĐỘNG HỌC</span>
-            <span className="text-[#FFBF81] font-semibold" data-testid="hud-flight-phase">
+            <span className="text-[#9A9EA4] block text-[10px]">PHA ĐỘNG HỌC</span>
+            <span className="text-[#F5A623] font-semibold" data-testid="hud-flight-phase">
               {flightPhaseLabel}
             </span>
           </div>
           <div>
-            <span className="text-[#95A5B3] block text-[10px]">TÂM MÔ HÌNH XZ</span>
-            <span className="text-[#9EE4BE] font-semibold" data-testid="hud-anchor-xz">
+            <span className="text-[#9A9EA4] block text-[10px]">TÂM MÔ HÌNH XZ</span>
+            <span className="text-[#C8CACD] font-semibold" data-testid="hud-anchor-xz">
               [0.00, 0.00] CỐ ĐỊNH
             </span>
           </div>
@@ -218,9 +218,9 @@ export const TopBar: React.FC = () => {
 
         {/* Active Callout Annotation Banner (Reference Video Style: 01..08 Callout) */}
         {(selectedPart || isFlightActive || effectiveCutaway) && (
-          <div className="hidden lg:block mt-2.5 p-3 rounded-xl bg-[#0B0F17]/90 border-l-2 border-[#FFB84D] border-t border-r border-b border-t-[#263342] border-r-[#263342] border-b-[#263342] font-mono text-xs shadow-xl">
+          <div className="hidden lg:block mt-2.5 p-3 rounded-md bg-[#0E0E10]/90 border-l-2 border-[#F5A623] border-t border-r border-b border-t-[#2A2B2E] border-r-[#2A2B2E] border-b-[#2A2B2E] font-mono text-xs shadow-xl">
             <div className="flex items-center gap-2 mb-1">
-              <span className="text-[#FFB84D] font-bold">
+              <span className="text-[#F5A623] font-bold">
                 {selectedPart
                   ? String(selectedPart.inspectOrder ?? 1).padStart(2, '0')
                   : autoFlightCutaway
@@ -229,7 +229,7 @@ export const TopBar: React.FC = () => {
                       ? '07'
                       : '00'}
               </span>
-              <span className="text-[#E9F0F5] font-semibold">
+              <span className="text-[#EDEEF0] font-semibold">
                 {selectedPart
                   ? `${selectedPart.label.vi} · ${selectedPart.label.en}`
                   : autoFlightCutaway
@@ -239,7 +239,7 @@ export const TopBar: React.FC = () => {
                       : 'Cutaway X-Ray Structural View'}
               </span>
             </div>
-            <p className="font-body text-[11px] text-[#95A5B3] leading-relaxed">
+            <p className="font-body text-[11px] text-[#9A9EA4] leading-relaxed">
               {selectedPart
                 ? selectedPart.description?.vi
                 : autoFlightCutaway

@@ -11,6 +11,22 @@ import { useAppStore } from '@/domain/store';
 import type { AssetAuditReport } from '@/domain/types';
 import { useAircraftRig } from './AircraftRig';
 
+/**
+ * Reference-video "technical drawing" look: a thin white fresnel rim on the matte-black shell
+ * so curved silhouettes read as white contour lines (crease edges come from EdgesGeometry).
+ */
+function applySilhouetteRim(mat: THREE.MeshStandardMaterial): void {
+  mat.onBeforeCompile = (shader) => {
+    shader.fragmentShader = shader.fragmentShader.replace(
+      '#include <dithering_fragment>',
+      `float axRim = 1.0 - abs(dot(normalize(normal), normalize(vViewPosition)));
+      gl_FragColor.rgb += vec3(0.86, 0.88, 0.91) * pow(axRim, 5.0) * 0.55 * gl_FragColor.a;
+      #include <dithering_fragment>`
+    );
+  };
+  mat.customProgramCacheKey = () => 'ax9-silhouette-rim';
+}
+
 export const JetModel: React.FC = () => {
   const gltf = useGLTF(AIRCRAFT_MODEL_URL);
   const { partNodesMapRef } = useAircraftRig();
@@ -29,20 +45,24 @@ export const JetModel: React.FC = () => {
     for (const mesh of meshes) {
       mesh.castShadow = true;
       mesh.receiveShadow = true;
-      if (Array.isArray(mesh.material)) {
-        mesh.material = mesh.material.map((m) => m.clone());
-      } else if (mesh.material) {
-        const clonedMat = mesh.material.clone() as THREE.MeshStandardMaterial;
-        clonedMat.envMapIntensity = 1.65;
-        mesh.material = clonedMat;
-      }
+      const prepare = (m: THREE.Material): THREE.Material => {
+        const clonedMat = m.clone() as THREE.MeshStandardMaterial;
+        if (clonedMat.isMeshStandardMaterial) {
+          clonedMat.envMapIntensity = 0.7;
+          applySilhouetteRim(clonedMat);
+        }
+        return clonedMat;
+      };
+      mesh.material = Array.isArray(mesh.material)
+        ? mesh.material.map(prepare)
+        : prepare(mesh.material);
 
       if (mesh.geometry) {
         const edgesGeo = new THREE.EdgesGeometry(mesh.geometry, 32);
         const edgesMat = new THREE.LineBasicMaterial({
-          color: 0xdceaf8,
+          color: 0xe6e9ec,
           transparent: true,
-          opacity: 0.64,
+          opacity: 0.55,
         });
         const edgeLines = new THREE.LineSegments(edgesGeo, edgesMat);
         edgeLines.name = `${mesh.name}__CAD_EDGES`;

@@ -53,7 +53,7 @@ export const ModeSwitch: React.FC = () => {
     <div
       role="tablist"
       aria-label="Chế độ trình diễn AERIS X-9"
-      className="inline-flex items-center gap-1 rounded-xl bg-[#070A0F]/90 p-1 border border-[#2D3B49]"
+      className="inline-flex items-center gap-1 rounded-md bg-[#0A0A0B]/90 p-1 border border-[#333438]"
     >
       <button
         type="button"
@@ -64,8 +64,8 @@ export const ModeSwitch: React.FC = () => {
         disabled={isFlightActive && !canReturn}
         className={`min-h-[44px] px-3.5 py-2 rounded-lg text-xs font-semibold tracking-wider uppercase transition-all flex items-center gap-2 ${
           isShowroomActive
-            ? 'bg-[#17222E] text-[#67E5DF] border border-[#67E5DF]/50 shadow-[0_0_16px_rgba(103,229,223,0.18)]'
-            : 'text-[#95A5B3] hover:text-[#E9F0F5] border border-transparent disabled:opacity-40 disabled:cursor-not-allowed'
+            ? 'bg-[#1C1D20] text-[#F2F3F5] border border-[#F2F3F5]/50'
+            : 'text-[#9A9EA4] hover:text-[#EDEEF0] border border-transparent disabled:opacity-40 disabled:cursor-not-allowed'
         }`}
       >
         <Compass className="w-3.5 h-3.5 shrink-0" />
@@ -82,8 +82,8 @@ export const ModeSwitch: React.FC = () => {
         title={!canExplode ? 'Khóa tháo rời khi đang bay' : 'Tách cấu trúc 46 bộ phận'}
         className={`min-h-[44px] px-3.5 py-2 rounded-lg text-xs font-semibold tracking-wider uppercase transition-all flex items-center gap-2 ${
           isExploreActive
-            ? 'bg-[#17222E] text-[#67E5DF] border border-[#67E5DF]/50 shadow-[0_0_16px_rgba(103,229,223,0.18)]'
-            : 'text-[#95A5B3] hover:text-[#E9F0F5] border border-transparent disabled:opacity-40 disabled:cursor-not-allowed'
+            ? 'bg-[#1C1D20] text-[#F2F3F5] border border-[#F2F3F5]/50'
+            : 'text-[#9A9EA4] hover:text-[#EDEEF0] border border-transparent disabled:opacity-40 disabled:cursor-not-allowed'
         }`}
       >
         <Box className="w-3.5 h-3.5 shrink-0" />
@@ -100,8 +100,8 @@ export const ModeSwitch: React.FC = () => {
         title={flightBlockedReason ?? 'Khởi động chu trình biến hình bay 7 giây'}
         className={`min-h-[44px] px-3.5 py-2 rounded-lg text-xs font-semibold tracking-wider uppercase transition-all flex items-center gap-2 ${
           isFlightActive
-            ? 'bg-[#17222E] text-[#FFBF81] border border-[#FFBF81]/60 shadow-[0_0_16px_rgba(255,191,129,0.2)]'
-            : 'text-[#95A5B3] hover:text-[#E9F0F5] border border-transparent disabled:opacity-40 disabled:cursor-not-allowed'
+            ? 'bg-[#1C1D20] text-[#F5A623] border border-[#F5A623]/60'
+            : 'text-[#9A9EA4] hover:text-[#EDEEF0] border border-transparent disabled:opacity-40 disabled:cursor-not-allowed'
         }`}
       >
         <Plane className="w-3.5 h-3.5 shrink-0" />

@@ -81,23 +81,23 @@ export const MaterialHighlight: React.FC = () => {
           const lineMat = lineSeg.material as THREE.LineBasicMaterial;
           if (lineMat) {
             if (isSelected) {
-              lineMat.color.setHex(0x67e5df);
+              lineMat.color.setHex(0xf5a623);
               lineMat.opacity = 0.98;
             } else if (isHovered) {
-              lineMat.color.setHex(0x67e5df);
+              lineMat.color.setHex(0xf5a623);
               lineMat.opacity = 0.86;
             } else if (isInternalHighlight) {
               lineMat.color.setHex(0xffb84d);
               lineMat.opacity = 0.95;
             } else if (isOuterGhostShell) {
-              lineMat.color.setHex(0x9bc5ef);
+              lineMat.color.setHex(0xc4c9cf);
               lineMat.opacity = 0.42;
             } else if (shouldDim) {
-              lineMat.color.setHex(0x7c97ad);
+              lineMat.color.setHex(0x80868d);
               lineMat.opacity = 0.12;
             } else {
-              lineMat.color.setHex(0xdceaf8);
-              lineMat.opacity = 0.64;
+              lineMat.color.setHex(0xe6e9ec);
+              lineMat.opacity = 0.55;
             }
             lineMat.needsUpdate = true;
           }
@@ -127,14 +127,14 @@ export const MaterialHighlight: React.FC = () => {
 
           if (isSelected) {
             stdMat.color.setHex(orig.colorHex);
-            stdMat.emissive.setHex(0x67e5df);
+            stdMat.emissive.setHex(0xf5a623);
             stdMat.emissiveIntensity = 0.46;
             stdMat.opacity = 1.0;
             stdMat.transparent = orig.transparent;
             stdMat.depthWrite = true;
           } else if (isHovered) {
             stdMat.color.setHex(orig.colorHex);
-            stdMat.emissive.setHex(0x67e5df);
+            stdMat.emissive.setHex(0xf5a623);
             stdMat.emissiveIntensity = 0.25;
             stdMat.opacity = shouldDim ? 0.25 : orig.opacity;
             stdMat.transparent = shouldDim ? true : orig.transparent;
@@ -149,8 +149,8 @@ export const MaterialHighlight: React.FC = () => {
             stdMat.depthWrite = true;
           } else if (isOuterGhostShell) {
             // Reference Video Cutaway X-Ray: Outer airframe becomes translucent X-Ray ghost shell
-            stdMat.color.setHex(0x1b2838);
-            stdMat.emissive.setHex(0x3a6085);
+            stdMat.color.setHex(0x1a1c20);
+            stdMat.emissive.setHex(0x5a6068);
             stdMat.emissiveIntensity = 0.14;
             stdMat.opacity = 0.15;
             stdMat.transparent = true;
@@ -291,7 +291,7 @@ export const MaterialHighlight: React.FC = () => {
         <Line
           key={`datum-line-${i}`}
           points={pts}
-          color="#67E5DF"
+          color="#D9DDE2"
           lineWidth={1.0}
           dashed
           dashSize={0.12}
