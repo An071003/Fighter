@@ -27,4 +27,8 @@ export type SceneEvent =
   | { type: 'RESET_SCENE' }
   | { type: 'SET_QUALITY'; tier: QualityTier }
   | { type: 'SET_REDUCED_MOTION'; enabled: boolean }
-  | { type: 'RETRY' };
+  | { type: 'RETRY' }
+  | { type: 'STORY_GOTO'; index: number }
+  | { type: 'STORY_NEXT' }
+  | { type: 'STORY_PREV' }
+  | { type: 'STORY_EXIT' };

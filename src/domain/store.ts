@@ -10,6 +10,8 @@ import {
   resolveBaseModeForExplodeAndSelection,
 } from './machine';
 import { getPartById } from './partRegistry';
+import { STORY_PHASES, clampStoryIndex } from './story';
+import { getFlightPhaseLabel } from './timeline';
 import type {
   AssetAuditReport,
   CameraPresetName,
@@ -98,6 +100,11 @@ export interface AppState {
   strobeOn: boolean;
   landingLightOn: boolean;
 
+  // Guided 7-phase story (reference video narrative). null = story inactive.
+  storyPhaseIndex: number | null;
+  /** Flight clock stops advancing at this time (story segments). null = run to completion. */
+  flightHoldSeconds: number | null;
+
   // Actions
   dispatch: (event: SceneEvent) => void;
   setHoveredPartId: (partId: string | null) => void;
@@ -129,6 +136,23 @@ const TOUR_PART_IDS = [
   'gear-strut-left',
   'panel-left-1',
 ];
+
+const FLIGHT_END_SECONDS = 7.0;
+
+/** User-driven events that hand control back from the guided story. */
+const STORY_TAKEOVER_EVENTS = new Set<SceneEvent['type']>([
+  'SELECT_PART',
+  'SET_EXPLODE_PROGRESS',
+  'TOGGLE_EXPLODE',
+  'START_FLIGHT',
+  'REPLAY_FLIGHT',
+  'RETURN_TO_SHOWROOM',
+  'SEEK_TIMELINE',
+  'SET_CAMERA_PRESET',
+  'RESET_VIEW',
+  'RESET_SCENE',
+  'RETRY',
+]);
 
 const clamp01 = (v: number): number => Math.max(0, Math.min(1, v));
 
@@ -169,6 +193,9 @@ export const useAppStore = create<AppState>((set, get) => ({
   beaconOn: true,
   strobeOn: true,
   landingLightOn: true,
+
+  storyPhaseIndex: null,
+  flightHoldSeconds: null,
 
   toggleCutaway: () => {
     const next = !get().isCutaway;
@@ -261,6 +288,13 @@ export const useAppStore = create<AppState>((set, get) => ({
   },
 
   dispatch: (event: SceneEvent) => {
+    // Any manual takeover of camera / structure / flight ends the guided story first.
+    if (get().storyPhaseIndex !== null && STORY_TAKEOVER_EVENTS.has(event.type)) {
+      const wasHovering = get().mode === 'hover';
+      get().dispatch({ type: 'STORY_EXIT' });
+      if (event.type === 'RETURN_TO_SHOWROOM' && wasHovering) return;
+    }
+
     const state = get();
 
     switch (event.type) {
@@ -621,6 +655,131 @@ export const useAppStore = create<AppState>((set, get) => ({
           qualityTier: event.tier,
           resolvedQuality: resolved,
           statusToast: `Chất lượng đồ họa: ${event.tier.toUpperCase()}`,
+        });
+        return;
+      }
+
+      case 'STORY_GOTO': {
+        if (!state.assetReady) return;
+        const index = clampStoryIndex(event.index);
+        const phase = STORY_PHASES[index];
+        const base = {
+          storyPhaseIndex: index,
+          selectedPartId: null,
+          hoveredPartId: null,
+          isIsolated: false,
+          isTourActive: false,
+          isPartsDrawerOpen: false,
+          explodeProgress: 0,
+          isCutaway: phase.systems.cutaway,
+          beaconOn: phase.systems.beacon,
+          strobeOn: phase.systems.strobe,
+          landingLightOn: phase.systems.landing,
+          statusToast: null,
+        };
+        visualClockRef.turntableAngleRad = 0;
+        visualClockRef.explodeAnimatedProgress01 = 0;
+
+        const flight = phase.flight;
+        if (flight.kind === 'ground') {
+          resetVisualClock();
+          set({
+            ...base,
+            mode: 'showroom',
+            flightPaused: false,
+            flightHoldSeconds: null,
+            flightElapsedUi: 0,
+            returnProgressUi: 0,
+            flightPhaseLabel: 'STANDBY',
+          });
+          return;
+        }
+
+        visualClockRef.hoverElapsedSeconds = 0;
+        visualClockRef.returnProgress01 = 0;
+        const segmentEnd = flight.kind === 'hover' ? FLIGHT_END_SECONDS : flight.toSeconds;
+
+        // Hover phase, or reduced motion: jump straight to the end of the segment.
+        if (flight.kind === 'hover' || state.reducedMotion) {
+          visualClockRef.flightTimeSeconds = segmentEnd;
+          const airborneHold = segmentEnd >= FLIGHT_END_SECONDS;
+          set({
+            ...base,
+            mode: airborneHold ? 'hover' : 'flight-transition',
+            flightPaused: false,
+            flightHoldSeconds: airborneHold ? null : segmentEnd,
+            flightElapsedUi: segmentEnd,
+            returnProgressUi: 0,
+            flightPhaseLabel: getFlightPhaseLabel(segmentEnd),
+          });
+          return;
+        }
+
+        // Play the segment; continue from the current clock when already inside it.
+        const t = visualClockRef.flightTimeSeconds;
+        const continuing =
+          state.mode === 'flight-transition' && t >= flight.fromSeconds - 0.05 && t <= segmentEnd;
+        if (!continuing) visualClockRef.flightTimeSeconds = flight.fromSeconds;
+        set({
+          ...base,
+          mode: 'flight-transition',
+          flightPaused: false,
+          // Segments ending at 7.0s run to completion and hand off to hover.
+          flightHoldSeconds: segmentEnd >= FLIGHT_END_SECONDS ? null : segmentEnd,
+          flightElapsedUi: visualClockRef.flightTimeSeconds,
+          returnProgressUi: 0,
+          flightPhaseLabel: getFlightPhaseLabel(visualClockRef.flightTimeSeconds),
+        });
+        return;
+      }
+
+      case 'STORY_NEXT': {
+        const next = state.storyPhaseIndex === null ? 0 : state.storyPhaseIndex + 1;
+        if (next >= STORY_PHASES.length) return;
+        get().dispatch({ type: 'STORY_GOTO', index: next });
+        return;
+      }
+
+      case 'STORY_PREV': {
+        if (state.storyPhaseIndex === null || state.storyPhaseIndex <= 0) return;
+        get().dispatch({ type: 'STORY_GOTO', index: state.storyPhaseIndex - 1 });
+        return;
+      }
+
+      case 'STORY_EXIT': {
+        if (state.storyPhaseIndex === null) return;
+        const exitBase = {
+          storyPhaseIndex: null,
+          flightHoldSeconds: null,
+          isCutaway: false,
+          beaconOn: true,
+          strobeOn: true,
+          landingLightOn: true,
+        };
+        if (state.mode === 'hover' && !state.reducedMotion) {
+          // Land gracefully through the existing reverse choreography.
+          visualClockRef.returnProgress01 = 0;
+          set({
+            ...exitBase,
+            mode: 'return-transition',
+            flightPaused: false,
+            returnProgressUi: 0,
+            flightPhaseLabel: 'RETURNING',
+            statusToast: 'Kết thúc hành trình: hạ càng đáp và trở về bàn xoay.',
+          });
+          return;
+        }
+        resetVisualClock();
+        set({
+          ...exitBase,
+          mode: 'showroom',
+          flightPaused: false,
+          flightElapsedUi: 0,
+          returnProgressUi: 0,
+          flightPhaseLabel: 'STANDBY',
+          cameraPreset: 'hero',
+          cameraResetNonce: state.cameraResetNonce + 1,
+          statusToast: 'Đã thoát hành trình bay, trở về bàn xoay trưng bày.',
         });
         return;
       }

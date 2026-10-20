@@ -7,6 +7,7 @@ import {
   Play,
   PlaneLanding,
   PlaneTakeoff,
+  Route,
   RotateCcw,
 } from 'lucide-react';
 import { FLIGHT_DURATION_SECONDS } from '@/domain/config';
@@ -265,6 +266,17 @@ export const BottomTransport: React.FC = () => {
                   {flightBlockedReason}
                 </span>
               )}
+              <button
+                type="button"
+                data-testid="story-start"
+                disabled={!canStartFlight}
+                onClick={() => dispatch({ type: 'STORY_GOTO', index: 0 })}
+                title={flightBlockedReason ?? 'Hành trình bay 7 pha có chú thích (Phím 1–7)'}
+                className="min-h-[44px] px-3.5 py-2.5 rounded-xl bg-[#070A0F] border border-[#F5A623]/60 text-[#FFD08A] font-semibold text-xs uppercase tracking-wider inline-flex items-center gap-2 whitespace-nowrap hover:bg-[#2B2112]/70 disabled:opacity-40 disabled:cursor-not-allowed transition-colors"
+              >
+                <Route className="w-4 h-4" />
+                <span className="hidden sm:inline">Hành trình 7 pha</span>
+              </button>
               <button
                 type="button"
                 data-testid="flight-start"

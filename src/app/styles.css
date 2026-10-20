@@ -79,3 +79,11 @@ input[type="range"].aeris-slider:disabled {
   opacity: 0.4;
   cursor: not-allowed;
 }
+
+.no-scrollbar {
+  scrollbar-width: none;
+}
+
+.no-scrollbar::-webkit-scrollbar {
+  display: none;
+}

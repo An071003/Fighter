@@ -7,6 +7,7 @@ import { StatusToast } from '@/interface/common/StatusToast';
 import { PartDetails } from '@/interface/inspect/PartDetails';
 import { BottomTransport } from '@/interface/shell/BottomTransport';
 import { TopBar } from '@/interface/shell/TopBar';
+import { StoryHud } from '@/interface/story/StoryHud';
 import { AppProviders } from './providers';
 
 declare global {
@@ -21,6 +22,7 @@ declare global {
 export const App: React.FC = () => {
   const mode = useAppStore((s) => s.mode);
   const assetReady = useAppStore((s) => s.assetReady);
+  const storyActive = useAppStore((s) => s.storyPhaseIndex !== null);
 
   useEffect(() => {
     // Expose read-only test diagnostic handle for Playwright QA assertions
@@ -70,10 +72,16 @@ export const App: React.FC = () => {
         </AnimatePresence>
 
         {/* Semantic HTML Overlay Interface (Zero Three.js Imports) */}
-        <TopBar />
-        <PartDetails />
+        {storyActive ? (
+          <StoryHud />
+        ) : (
+          <>
+            <TopBar />
+            <PartDetails />
+            <BottomTransport />
+          </>
+        )}
         <StatusToast />
-        <BottomTransport />
         <KeyboardHelp />
       </main>
     </AppProviders>

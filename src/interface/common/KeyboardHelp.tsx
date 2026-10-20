@@ -1,6 +1,8 @@
 import React, { useEffect } from 'react';
 import { AlertTriangle, Keyboard, RefreshCw, X } from 'lucide-react';
+import { selectCanStartFlight } from '@/domain/selectors';
 import { useAppStore } from '@/domain/store';
+import { STORY_PHASES } from '@/domain/story';
 
 export const KeyboardHelp: React.FC = () => {
   const isHelpOpen = useAppStore((s) => s.isHelpOpen);
@@ -23,6 +25,32 @@ export const KeyboardHelp: React.FC = () => {
           target.blur();
         }
         return;
+      }
+
+      // Guided story: 1–7 jump to a phase, arrows step, C/B/S/L toggle systems & lights.
+      const story = useAppStore.getState();
+      if (e.key >= '1' && e.key <= '7' && !e.ctrlKey && !e.metaKey && !e.altKey) {
+        if (story.storyPhaseIndex !== null || selectCanStartFlight(story)) {
+          dispatch({ type: 'STORY_GOTO', index: Number(e.key) - 1 });
+        }
+        return;
+      }
+      if (story.storyPhaseIndex !== null) {
+        const k = e.key.toLowerCase();
+        if (e.key === 'Escape' && !story.isHelpOpen) {
+          dispatch({ type: 'STORY_EXIT' });
+          return;
+        }
+        if (e.key === 'ArrowRight') return dispatch({ type: 'STORY_NEXT' });
+        if (e.key === 'ArrowLeft') return dispatch({ type: 'STORY_PREV' });
+        if (k === 'c') return story.toggleCutaway();
+        if (k === 'b') return story.toggleAircraftLight('beacon');
+        if (k === 's') return story.toggleAircraftLight('strobe');
+        if (k === 'l') return story.toggleAircraftLight('landing');
+        if (k === 'i') {
+          const partId = STORY_PHASES[story.storyPhaseIndex].callout.partId;
+          return dispatch({ type: 'SELECT_PART', partId });
+        }
       }
 
       if (e.key === 'Escape') {
@@ -129,6 +157,9 @@ export const KeyboardHelp: React.FC = () => {
             { key: 'F', desc: 'Khởi động bay hoặc Hạ cánh về bàn xoay' },
             { key: 'R', desc: 'Đặt lại góc máy quay chuẩn 3/4 Hero' },
             { key: 'Esc', desc: 'Bỏ chọn bộ phận / Đóng bảng chi tiết' },
+            { key: '1 – 7', desc: 'Hành trình bay: nhảy tới pha (Sân đỗ → 10.000 ft)' },
+            { key: '← / →', desc: 'Hành trình bay: pha trước / pha sau' },
+            { key: 'C · B · S · L', desc: 'Hành trình bay: Cutaway, đèn nháy, đèn chớp, đèn lăn' },
           ].map((item) => (
             <div
               key={item.key}

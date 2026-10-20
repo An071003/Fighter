@@ -11,6 +11,7 @@ import { ResourceBoundary } from './quality/ResourceBoundary';
 import { CameraRig } from './scene/CameraRig';
 import { StudioLighting } from './scene/StudioLighting';
 import { Turntable } from './scene/Turntable';
+import { StoryAnchorProjector } from './story/StoryAnchorProjector';
 import { Atmosphere } from './vfx/Atmosphere';
 import { AircraftSystemsVfx } from './vfx/AircraftSystemsVfx';
 import { MaterialHighlight } from './vfx/MaterialHighlight';
@@ -46,6 +47,7 @@ export const SceneRoot: React.FC = () => {
       <WindTrails />
       <ParallaxEnvironment />
       <CameraRig />
+      <StoryAnchorProjector />
     </AircraftRigProvider>
   );
 };

@@ -43,9 +43,14 @@ export const FlightDirector: React.FC = () => {
     // 1. Evaluate authoritative timeline frame based on current mode
     if (state.mode === 'flight-transition') {
       if (!state.flightPaused) {
-        visualClockRef.flightTimeSeconds = Math.min(
+        // Story segments may hold the clock before the hover hand-off (e.g. end of take-off roll).
+        const limit = Math.min(
           FLIGHT_DURATION_SECONDS,
-          visualClockRef.flightTimeSeconds + dt
+          state.flightHoldSeconds ?? FLIGHT_DURATION_SECONDS
+        );
+        visualClockRef.flightTimeSeconds = Math.max(
+          visualClockRef.flightTimeSeconds,
+          Math.min(limit, visualClockRef.flightTimeSeconds + dt)
         );
       }
 
@@ -110,6 +115,7 @@ export const FlightDirector: React.FC = () => {
 
       const shouldAutoSpin =
         state.mode === 'showroom' &&
+        state.storyPhaseIndex === null &&
         state.cameraPreset === 'hero' &&
         !state.reducedMotion &&
         !state.isUserOrbiting &&
@@ -121,7 +127,7 @@ export const FlightDirector: React.FC = () => {
           (visualClockRef.turntableAngleRad +
             TURNTABLE_DEG_PER_SEC * DEG2RAD * dt) %
           (Math.PI * 2);
-      } else if (state.cameraPreset !== 'hero') {
+      } else if (state.cameraPreset !== 'hero' || state.storyPhaseIndex !== null) {
         visualClockRef.turntableAngleRad = 0;
       }
     }

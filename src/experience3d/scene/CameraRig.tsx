@@ -6,6 +6,7 @@ import type { OrbitControls as OrbitControlsImpl } from 'three-stdlib';
 import { CAMERA_PRESETS } from '@/domain/config';
 import { getPartById } from '@/domain/partRegistry';
 import { useAppStore } from '@/domain/store';
+import { getStoryPhase } from '@/domain/story';
 import { useAircraftRig } from '../aircraft/AircraftRig';
 
 export const CameraRig: React.FC = () => {
@@ -18,6 +19,7 @@ export const CameraRig: React.FC = () => {
   const selectedPartId = useAppStore((s) => s.selectedPartId);
   const explodeProgress = useAppStore((s) => s.explodeProgress);
   const mode = useAppStore((s) => s.mode);
+  const storyActive = useAppStore((s) => s.storyPhaseIndex !== null);
   const setIsUserOrbiting = useAppStore((s) => s.setIsUserOrbiting);
 
   const isTransitionActiveRef = useRef<boolean>(false);
@@ -99,6 +101,32 @@ export const CameraRig: React.FC = () => {
 
     const state = useAppStore.getState();
 
+    // Guided story: each phase owns its shot; airborne shots follow the jet's height.
+    const storyPhase = getStoryPhase(state.storyPhaseIndex);
+    if (storyPhase) {
+      const frame = currentFlightFrameRef.current;
+      const shot = storyPhase.camera;
+      const distScale = size.width < 768 ? 1.35 : size.width / size.height < 1.2 ? 1.15 : 1.0;
+      desiredTargetRef.current.set(shot.target[0], shot.target[1] + frame.jetY, shot.target[2]);
+      desiredPosRef.current
+        .set(shot.position[0], shot.position[1] + frame.jetY, shot.position[2])
+        .sub(desiredTargetRef.current)
+        .multiplyScalar(distScale)
+        .add(desiredTargetRef.current);
+
+      const factor = state.reducedMotion ? 1.0 : Math.min(1, dt * 2.4);
+      camera.position.lerp(desiredPosRef.current, factor);
+      controls.target.lerp(desiredTargetRef.current, factor);
+      const perspCam = camera as THREE.PerspectiveCamera;
+      if (perspCam.isPerspectiveCamera && Math.abs(perspCam.fov - shot.fov) > 0.01) {
+        perspCam.fov += (shot.fov - perspCam.fov) * factor;
+        perspCam.updateProjectionMatrix();
+      }
+      controls.update();
+      isTransitionActiveRef.current = false;
+      return;
+    }
+
     // During flight-transition or return-transition, director owns camera dolly/framing
     if (state.mode === 'flight-transition' || state.mode === 'return-transition') {
       const frame = currentFlightFrameRef.current;
@@ -151,7 +179,7 @@ export const CameraRig: React.FC = () => {
   });
 
   const orbitLocked =
-    mode === 'flight-transition' || mode === 'return-transition';
+    storyActive || mode === 'flight-transition' || mode === 'return-transition';
 
   return (
     <OrbitControls

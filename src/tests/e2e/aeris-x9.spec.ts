@@ -187,4 +187,74 @@ test.describe('AERIS X-9 — End-to-End & Visual Acceptance Suite (Gates G2–G8
     });
     expect(overflow360).toBe(false);
   });
+  test('Guided 7-phase story: hotkeys, pinned callouts, take-off hold, climb cutaway, cruise and exit', async ({
+    page,
+  }) => {
+    const pageErrors: string[] = [];
+    page.on('pageerror', (err) => pageErrors.push(err.message));
+
+    await page.setViewportSize({ width: 1440, height: 900 });
+    await page.goto('/');
+    const root = page.getByTestId('aeris-app-root');
+    await expect(root).toHaveAttribute('data-asset-ready', 'true', { timeout: 25000 });
+
+    // Enter from the transport CTA
+    await page.getByTestId('story-start').click();
+    const hud = page.getByTestId('story-hud');
+    await expect(hud).toHaveAttribute('data-story-phase', 'gate');
+    await expect(page.getByTestId('story-phase-label')).toContainText('01 / 07');
+
+    // Callout is pinned to the canopy and lands inside the viewport
+    const callout = page.getByTestId('story-callout');
+    await expect(callout).toHaveAttribute('data-part-id', 'canopy-glass');
+    await expect(callout).toBeVisible();
+    const box = await callout.boundingBox();
+    expect(box).not.toBeNull();
+    expect(box!.x).toBeGreaterThanOrEqual(0);
+    expect(box!.x + box!.width).toBeLessThanOrEqual(1440);
+
+    // Hotkey 3 → taxi, ground mode, landing light on
+    await page.keyboard.press('3');
+    await expect(hud).toHaveAttribute('data-story-phase', 'taxi');
+    await expect(root).toHaveAttribute('data-scene-mode', 'showroom');
+    await expect(page.getByTestId('story-toggle-landing')).toHaveAttribute('aria-pressed', 'true');
+    await page.keyboard.press('l');
+    await expect(page.getByTestId('story-toggle-landing')).toHaveAttribute('aria-pressed', 'false');
+
+    // Take-off plays the flight timeline and holds at 3.0s with anchor XZ locked
+    await page.keyboard.press('5');
+    await expect(root).toHaveAttribute('data-scene-mode', 'flight-transition');
+    await page.waitForFunction(
+      () => window.__AERIS_DEBUG__!.getVisualClock().flightTimeSeconds >= 2.99,
+      null,
+      { timeout: 20000 }
+    );
+    await page.waitForTimeout(400);
+    const held = await page.evaluate(() => {
+      const c = window.__AERIS_DEBUG__!.getVisualClock();
+      return { t: c.flightTimeSeconds, x: c.anchorWorldX, z: c.anchorWorldZ };
+    });
+    expect(held.t).toBeCloseTo(3.0, 2);
+    expect(held.x).toBe(0);
+    expect(held.z).toBe(0);
+
+    // Climb (ArrowRight) → cutaway on, runs into hover
+    await page.keyboard.press('ArrowRight');
+    await expect(hud).toHaveAttribute('data-story-phase', 'climb');
+    await expect(page.getByTestId('story-toggle-cutaway')).toHaveAttribute('aria-pressed', 'true');
+    await expect(root).toHaveAttribute('data-scene-mode', 'hover', { timeout: 20000 });
+    await page.screenshot({ path: 'proof/story-climb-cutaway.png' });
+
+    // Cruise
+    await page.keyboard.press('7');
+    await expect(page.getByTestId('story-metric-value')).toHaveText('10,000', { timeout: 5000 });
+    await page.screenshot({ path: 'proof/story-cruise.png' });
+
+    // Esc exits and lands back on the turntable
+    await page.keyboard.press('Escape');
+    await expect(hud).toHaveCount(0);
+    await expect(root).toHaveAttribute('data-scene-mode', 'showroom', { timeout: 20000 });
+
+    expect(pageErrors).toEqual([]);
+  });
 });
