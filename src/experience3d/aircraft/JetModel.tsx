@@ -38,11 +38,11 @@ export const JetModel: React.FC = () => {
       }
 
       if (mesh.geometry) {
-        const edgesGeo = new THREE.EdgesGeometry(mesh.geometry, 36);
+        const edgesGeo = new THREE.EdgesGeometry(mesh.geometry, 32);
         const edgesMat = new THREE.LineBasicMaterial({
-          color: 0xc8e6f8,
+          color: 0xdceaf8,
           transparent: true,
-          opacity: 0.42,
+          opacity: 0.64,
         });
         const edgeLines = new THREE.LineSegments(edgesGeo, edgesMat);
         edgeLines.name = `${mesh.name}__CAD_EDGES`;

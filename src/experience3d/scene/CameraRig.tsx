@@ -36,7 +36,13 @@ export const CameraRig: React.FC = () => {
     const presetCfg = CAMERA_PRESETS[cameraPreset] ?? CAMERA_PRESETS.hero;
     const isMobile = size.width < 768;
     const mobileScale = isMobile ? 1.32 : 1.0;
-    const explodeScale = 1.0 + explodeProgress * 0.42;
+    const explodeScale = 1.0 + explodeProgress * 0.36;
+
+    const perspCam = camera as THREE.PerspectiveCamera;
+    if (perspCam.isPerspectiveCamera && perspCam.fov !== presetCfg.fov) {
+      perspCam.fov = presetCfg.fov;
+      perspCam.updateProjectionMatrix();
+    }
 
     if (selectedPartId && (mode === 'inspect' || mode === 'exploded')) {
       const part = getPartById(selectedPartId);
@@ -45,8 +51,8 @@ export const CameraRig: React.FC = () => {
         worldBoxRef.setFromObject(node);
         worldBoxRef.getCenter(boxCenterRef);
 
-        const dist = Math.max(5.8, 7.6 * (part.focus.distanceMultiplier || 0.78)) * mobileScale;
-        const elevY = part.category === 'GEAR' ? 0.45 : 2.15;
+        const dist = Math.max(6.8, 9.2 * (part.focus.distanceMultiplier || 0.78)) * mobileScale;
+        const elevY = part.category === 'GEAR' ? 0.55 : 2.35;
         const sideSign = boxCenterRef.x < -0.25 ? -1 : 1;
 
         // Offset target slightly so the part sits in the open viewport between left hero text and right inspector drawer
@@ -74,6 +80,7 @@ export const CameraRig: React.FC = () => {
     );
     isTransitionActiveRef.current = true;
   }, [
+    camera,
     cameraPreset,
     cameraResetNonce,
     selectedPartId,
@@ -111,13 +118,13 @@ export const CameraRig: React.FC = () => {
         ? 0
         : Math.sin(clock.elapsedTime * 0.45) * 0.25;
 
-      const targetCamX = (7.8 - frame.cameraDolly * 1.1 + swayX) * mobileScale;
+      const targetCamX = (9.4 - frame.cameraDolly * 0.9 + swayX) * mobileScale;
       const targetCamY =
-        (3.2 - gearInspectionWindow * 1.55 + frame.jetY * 0.65) * mobileScale;
-      const targetCamZ = (-8.6 - frame.cameraDolly * 0.9) * mobileScale;
+        (3.8 - gearInspectionWindow * 1.65 + frame.jetY * 0.65) * mobileScale;
+      const targetCamZ = (-10.2 - frame.cameraDolly * 0.8) * mobileScale;
 
       desiredPosRef.current.set(targetCamX, targetCamY, targetCamZ);
-      desiredTargetRef.current.set(0, 0.65 + frame.jetY * 0.85, 0);
+      desiredTargetRef.current.set(0, 0.72 + frame.jetY * 0.85, 0.1);
 
       camera.position.lerp(desiredPosRef.current, Math.min(1, dt * 3.8));
       controls.target.lerp(desiredTargetRef.current, Math.min(1, dt * 4.5));

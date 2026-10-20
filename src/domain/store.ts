@@ -92,6 +92,12 @@ export interface AppState {
   tourStepIndex: number;
   statusToast: string | null;
 
+  // Reference Video Engineering Modes (Cutaway X-Ray & Aircraft Lighting Systems)
+  isCutaway: boolean;
+  beaconOn: boolean;
+  strobeOn: boolean;
+  landingLightOn: boolean;
+
   // Actions
   dispatch: (event: SceneEvent) => void;
   setHoveredPartId: (partId: string | null) => void;
@@ -100,6 +106,8 @@ export interface AppState {
   setPartsDrawerOpen: (open: boolean) => void;
   setHelpOpen: (open: boolean) => void;
   setResolvedQuality: (tier: ResolvedQualityTier) => void;
+  toggleCutaway: () => void;
+  toggleAircraftLight: (light: 'beacon' | 'strobe' | 'landing') => void;
   syncTimelineUi: (
     flightSeconds: number,
     returnProgress01: number,
@@ -156,6 +164,32 @@ export const useAppStore = create<AppState>((set, get) => ({
   isTourActive: false,
   tourStepIndex: 0,
   statusToast: null,
+
+  isCutaway: false,
+  beaconOn: true,
+  strobeOn: true,
+  landingLightOn: true,
+
+  toggleCutaway: () => {
+    const next = !get().isCutaway;
+    set({
+      isCutaway: next,
+      statusToast: next
+        ? 'Chế độ Cutaway X-Ray: Làm trong suốt vỏ thân, hiển thị cơ cấu cơ khí & càng đáp bên trong.'
+        : 'Đã tắt chế độ Cutaway X-Ray.',
+    });
+  },
+
+  toggleAircraftLight: (light) => {
+    const state = get();
+    if (light === 'beacon') {
+      set({ beaconOn: !state.beaconOn });
+    } else if (light === 'strobe') {
+      set({ strobeOn: !state.strobeOn });
+    } else if (light === 'landing') {
+      set({ landingLightOn: !state.landingLightOn });
+    }
+  },
 
   setHoveredPartId: (partId) => {
     const state = get();
@@ -561,6 +595,10 @@ export const useAppStore = create<AppState>((set, get) => ({
           selectedPartId: null,
           hoveredPartId: null,
           isIsolated: false,
+          isCutaway: false,
+          beaconOn: true,
+          strobeOn: true,
+          landingLightOn: true,
           isTourActive: false,
           explodeProgress: 0,
           flightPaused: false,

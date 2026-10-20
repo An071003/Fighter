@@ -37,6 +37,13 @@ test.describe('AERIS X-9 — End-to-End & Visual Acceptance Suite (Gates G2–G8
     await page.waitForTimeout(600);
     await page.screenshot({ path: 'proof/showroom.png' });
 
+    // 1b. Cutaway X-Ray Mode verification (Reference Video Fig 1 - cutaway)
+    await page.getByTestId('cutaway-toggle').click();
+    await page.waitForTimeout(450);
+    await page.screenshot({ path: 'proof/cutaway-xray.png' });
+    await page.getByTestId('cutaway-toggle').click();
+    await page.waitForTimeout(300);
+
     // 2. Part Selection & Inspector Drawer (B02, B03)
     await page.getByTestId('parts-drawer-toggle').click();
     await expect(page.getByTestId('part-details-drawer')).toBeVisible();

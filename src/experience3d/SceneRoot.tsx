@@ -12,6 +12,7 @@ import { CameraRig } from './scene/CameraRig';
 import { StudioLighting } from './scene/StudioLighting';
 import { Turntable } from './scene/Turntable';
 import { Atmosphere } from './vfx/Atmosphere';
+import { AircraftSystemsVfx } from './vfx/AircraftSystemsVfx';
 import { MaterialHighlight } from './vfx/MaterialHighlight';
 import { WindTrails } from './vfx/WindTrails';
 
@@ -32,6 +33,7 @@ export const SceneRoot: React.FC = () => {
             <PartPicker>
               <JetModel />
             </PartPicker>
+            <AircraftSystemsVfx />
           </AircraftRig>
         </Suspense>
       </ResourceBoundary>

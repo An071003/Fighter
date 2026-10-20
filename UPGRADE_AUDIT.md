@@ -42,11 +42,13 @@ Các tệp mở rộng thuộc gói ZIP v2 bên ngoài chưa có mặt trên ổ
 ## 2. Chẩn Đoán Hình Ảnh Hiện Tại (v1) & Đối Chiếu Tham Chiếu (Visual Diagnosis)
 
 ### 2.1. Trạng thái xác minh tài liệu tham chiếu (Reference Verification)
-- **Video TikTok (`https://vt.tiktok.com/ZSgk2jsTC/`):** Đánh dấu **`UNVERIFIED_EXTERNAL_VIDEO`** đối với chuỗi chuyển động theo từng giây (do chưa có tệp MP4 trực tiếp). Không tuyên bố đã xem toàn bộ video gốc.
-- **Ảnh chụp màn hình tham chiếu người dùng vừa cung cấp (`media_1792421735084_ac484741.png`):** Đã kiểm tra trực tiếp. Những đặc trưng thị giác cốt lõi rút ra từ ảnh tham chiếu:
-  1. **Thẩm mỹ CAD Kỹ thuật Tối (Dark Technical Blueprint / Obsidian Hard-Surface):** Thân vỏ mang sắc đen-xám titan tối (`#121822` – `#1E2936`) kết hợp **đường viền cạnh kỹ thuật sắc nét (Technical Contour Edge Lines `#C8E6F5`)** chạy dọc mép cánh, thân, cửa khoang, động cơ và cánh đứng.
-  2. **Chi tiết bề mặt (Surface Micro-Details):** Có các dải chấm sáng kỹ thuật / cảm biến dọc sườn thân, đèn định vị đầu mút cánh (đỏ/xanh/cyan), và sự tách biệt rõ rệt giữa mặt ngoài nhẵn mờ với kết cấu cơ khí bên trong.
-  3. **Bàn xoay chuẩn kỹ thuật (Technical Datum Stage):** Mặt bàn xoay tối sâu với các vòng tròn đồng tâm mảnh và **đường trục chuẩn dọc màu hổ phách (Amber Longitudinal Datum Line)** kèm các điểm đèn LED định vị xanh lá / xanh dương / cam dọc đường băng.
+- **Video TikTok (`https://vt.tiktok.com/ZSgk2jsTC/` → [`reference/reference.mp4`](file:///c:/Users/ADMIN/Downloads/TEST_WEB/reference/reference.mp4)):** Đã tải và phân tích trực tiếp toàn bộ 37 giây (`00:00 – 00:36`) cùng ảnh chụp màn hình tham chiếu (`media_1792421735084_ac484741.png`):
+  1. **Thẩm mỹ CAD Kỹ thuật Tối (Dark Technical Blueprint / Obsidian Monolith — `Fig 1`):** Thân vỏ mang sắc đen-graphite mờ (`#0B0F17` – `#141C27`) kết hợp **đường viền cạnh kỹ thuật sắc nét (`#DCEAF8`)** chạy dọc mép cánh, thân, cửa khoang, động cơ và cánh đứng; góc máy 3/4 tiêu cự dài (`FOV 28°`) giúp toàn bộ sải cánh và mũi-đuôi nằm gọn trong vòng tròn bàn xoay mà không bị biến dạng phối cảnh góc rộng.
+  2. **Chế độ X-Ray Cutaway (`Fig 1 — cutaway` tại `00:26 – 00:28`):** Khi kiểm tra hệ thống cơ khí bên trong hoặc trong pha thu càng đáp (`GEAR RETRACT`), lớp vỏ ngoài chuyển sang **bóng ma xuyên thấu (X-Ray Ghost Shell `opacity: 0.15`)**, làm nổi bật toàn bộ cụm cơ khí, càng đáp 3 điểm, cánh tà và buồng lái bằng **sắc vàng hổ phách kỹ thuật (`#F5A623`)**.
+  3. **Hệ thống Động cơ, Đèn Hàng không & Telemetry Sống (`00:06 – 00:35`):**
+     - **01–03 (`00:08 – 00:11`):** Cánh quạt tuabin nén quay tăng tốc (`N1 %`) với đồng hồ số lớn góc trên bên trái (`N1 %`, `kt`, `ft`).
+     - **02 & 06 (`00:06`, `00:13`, `00:19`):** Đèn chống va chạm nháy đỏ `1 Hz` (`Beacon`) trên sống lưng/bụng, đèn Strobe chớp kép trắng đầu mút cánh, và **chùm đèn pha càng mũi (`Nose Taxi / Landing Light`)** chiếu vệt sáng hình nón xuống đường tâm màu hổ phách trên mặt bàn xoay.
+     - **Thanh trạng thái & Bảng điều khiển kỹ thuật (`SYSTEMS / LIGHTS`):** Bật/tắt nhanh `Cutaway`, `Beacon`, `Strobe`, `Nose Taxi` cùng dòng trạng thái kỹ thuật thời gian thực (`N1 % · kt · gear down/moving/up`).
 
 ### 2.2. Năm hạn chế thực tế của phiên bản v1 (`proof/u0-before-showroom.png` & `proof/u0-before-exploded.png`)
 1. **Hình học bị bo tròn kiểu viên nang ("Capsule / Pill Look"):**

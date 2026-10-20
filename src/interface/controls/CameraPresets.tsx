@@ -19,9 +19,9 @@ export const CameraPresets: React.FC = () => {
     <div
       role="group"
       aria-label="Góc máy quay thiết lập sẵn"
-      className="flex items-center gap-1 flex-wrap"
+      className="flex items-center gap-1 flex-nowrap whitespace-nowrap"
     >
-      <span className="hidden xl:inline-flex items-center gap-1 text-[11px] font-mono uppercase tracking-wider text-[#95A5B3] mr-1">
+      <span className="hidden 2xl:inline-flex items-center gap-1 text-[11px] font-mono uppercase tracking-wider text-[#95A5B3] mr-1">
         <Camera className="w-3.5 h-3.5 text-[#67E5DF]" />
         <span>Góc nhìn:</span>
       </span>
@@ -36,7 +36,7 @@ export const CameraPresets: React.FC = () => {
             disabled={isLocked}
             data-testid={`camera-preset-${presetKey}`}
             onClick={() => dispatch({ type: 'SET_CAMERA_PRESET', preset: presetKey })}
-            className={`min-h-[44px] px-2.5 py-1.5 rounded-lg text-xs font-medium transition-colors border ${
+            className={`min-h-[36px] px-2.5 py-1 rounded-lg text-[11px] font-medium transition-colors border whitespace-nowrap ${
               isActive
                 ? 'bg-[#17222E] text-[#67E5DF] border-[#67E5DF]/50'
                 : 'bg-[#070A0F]/75 text-[#95A5B3] hover:text-[#E9F0F5] border-[#2D3B49]/70 disabled:opacity-40 disabled:cursor-not-allowed'
@@ -52,7 +52,7 @@ export const CameraPresets: React.FC = () => {
         data-testid="camera-reset-button"
         onClick={() => dispatch({ type: 'RESET_VIEW' })}
         title="Đặt lại góc máy quay (Phím R)"
-        className="min-h-[44px] min-w-[44px] px-2.5 py-1.5 rounded-lg text-xs font-medium bg-[#070A0F]/80 text-[#E9F0F5] hover:text-[#67E5DF] border border-[#2D3B49] hover:border-[#67E5DF]/50 flex items-center justify-center gap-1.5 transition-colors"
+        className="min-h-[36px] min-w-[36px] px-2.5 py-1 rounded-lg text-[11px] font-medium bg-[#070A0F]/80 text-[#E9F0F5] hover:text-[#67E5DF] border border-[#2D3B49] hover:border-[#67E5DF]/50 flex items-center justify-center gap-1.5 transition-colors whitespace-nowrap"
       >
         <RotateCcw className="w-3.5 h-3.5" />
         <span className="hidden md:inline">Đặt lại góc</span>
