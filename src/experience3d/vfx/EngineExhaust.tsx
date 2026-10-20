@@ -4,11 +4,11 @@ import * as THREE from 'three';
 import { useAppStore } from '@/domain/store';
 import { useAircraftRig } from '../aircraft/AircraftRig';
 
-/** Nozzle exit centres in rig space (assembly offset y=1.42 + nozzle centre y=0.02). */
-const NOZZLES: ReadonlyArray<[number, number, number]> = [
-  [-0.5, 1.44, 4.46],
-  [0.5, 1.44, 4.46],
-];
+/** Nozzle exit centre in rig space (assembly offset y=1.42 + nozzle centre y=-0.01). */
+const NOZZLES: ReadonlyArray<[number, number, number]> = [[0, 1.41, 4.62]];
+
+/** Single large nozzle: plume layers are authored for r=0.16 and scaled up to the 0.34 exit. */
+const NOZZLE_SCALE = 2.1;
 
 const PLUME_VERTEX = /* glsl */ `
   varying vec2 vUv;
@@ -115,8 +115,16 @@ const LAYERS: PlumeLayer[] = [
 
 function makePlumeGeometry(layer: PlumeLayer): THREE.BufferGeometry {
   // radiusTop = tail end; uv.y runs 0 (nozzle) -> 1 (tail)
-  const g = new THREE.CylinderGeometry(layer.radiusTail, layer.radiusNozzle, layer.length, 32, 24, true);
-  g.translate(0, layer.length / 2, 0);
+  const len = layer.length * 1.35;
+  const g = new THREE.CylinderGeometry(
+    layer.radiusTail * NOZZLE_SCALE,
+    layer.radiusNozzle * NOZZLE_SCALE,
+    len,
+    40,
+    24,
+    true
+  );
+  g.translate(0, len / 2, 0);
   g.rotateX(Math.PI / 2);
   return g;
 }
@@ -129,7 +137,7 @@ export const EngineExhaust: React.FC = () => {
   const throttleRef = useRef(0);
 
   const geometries = useMemo(() => LAYERS.map(makePlumeGeometry), []);
-  const glowGeometry = useMemo(() => new THREE.CircleGeometry(0.34, 32), []);
+  const glowGeometry = useMemo(() => new THREE.CircleGeometry(0.5, 40), []);
 
   // One material per (engine, layer) so each plume gets its own flicker seed
   const materials = useMemo(
@@ -214,7 +222,7 @@ export const EngineExhaust: React.FC = () => {
           ))}
         </group>
       ))}
-      <pointLight ref={lightRef} position={[0, 1.4, 5.1]} color="#FF9A4A" distance={6} decay={2} intensity={0} />
+      <pointLight ref={lightRef} position={[0, 1.4, 5.3]} color="#FF9A4A" distance={6} decay={2} intensity={0} />
     </group>
   );
 };

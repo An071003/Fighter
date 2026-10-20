@@ -15,60 +15,79 @@ const smoothstep = (a: number, b: number, x: number) => {
   return t * t * (3 - 2 * t);
 };
 
-/** TS port of the generator's fuselage envelope: half-width, deck-top and belly y at station z. */
-function envelope(z: number): { hw: number; top: number; bot: number } {
-  if (z < -6.5 || z > 4.75) return { hw: 0, top: 0, bot: 0 };
-  if (z < -3.3) {
-    const u = clamp01((z + 6.5) / 3.2);
-    const o = u ** 0.85 * (0.7 + 0.3 * smoothstep(0, 1, u));
-    return { hw: 0.008 + 0.992 * o, top: -0.05 + 0.43 * o, bot: -0.06 - 0.26 * o };
-  }
-  if (z < 2.2) {
-    const u = clamp01((z + 3.3) / 5.5);
-    const s = Math.sin(Math.PI * u);
-    return { hw: 1 + 0.22 * s - 0.08 * smoothstep(0.65, 1, u), top: 0.38 + 0.04 * s, bot: -0.32 - 0.03 * s };
-  }
-  const taper = 1 - smoothstep(0, 1, clamp01((z - 2.2) / 2.55)) * 0.76;
-  return { hw: 0.92 * taper, top: 0.33 * taper, bot: -0.28 * taper };
+type Station = [number, number, number, number]; // hw, top, bot, chine
+
+const TIP: Station = [0.012, -0.02, -0.04, -0.03];
+const RADOME: Station = [0.64, 0.38, -0.34, -0.03];
+const COCKPIT: Station = [0.76, 0.5, -0.46, 0.02];
+const MID: Station = [1.16, 0.58, -0.56, 0.08];
+const AFT: Station = [1.09, 0.55, -0.52, 0.07];
+const TAIL: Station = [0.54, 0.44, -0.44, 0.0];
+
+const mixStation = (a: Station, b: Station, t: number): Station =>
+  a.map((v, i) => v + (b[i] - v) * t) as Station;
+
+/** TS port of the generator's stealth fuselage envelope (scripts/generate_aeris_x9.py, v8). */
+function envelope(z: number): { hw: number; top: number; bot: number; chine: number } {
+  let s: Station;
+  if (z < -6.5 || z > 4.1) return { hw: 0, top: 0, bot: 0, chine: 0 };
+  if (z < -4.55) s = mixStation(TIP, RADOME, clamp01((z + 6.5) / 1.95) ** 0.72);
+  else if (z < -3.2) s = mixStation(RADOME, COCKPIT, smoothstep(-4.55, -3.2, z));
+  else if (z < -0.6) s = mixStation(COCKPIT, MID, smoothstep(-3.2, -0.6, z));
+  else if (z < 2.2) s = mixStation(MID, AFT, smoothstep(-0.6, 2.2, z));
+  else s = mixStation(AFT, TAIL, smoothstep(2.2, 4.1, z));
+  return { hw: s[0], top: s[1], bot: s[2], chine: s[3] };
 }
 
-/** Canopy / dorsal spine height above the deck at (x, z). */
+/** Bubble canopy + dorsal hump height above the deck at (x, z). */
 function dorsal(x: number, z: number): number {
   let w: number;
   let dh: number;
-  if (z < -3.3 || z > 3.3) return 0;
-  if (z < -2.1) {
-    const u = clamp01((z + 3.3) / 1.2);
-    dh = 0.01 + 0.43 * smoothstep(0, 1, u) ** 0.85;
-    w = 0.08 + 0.36 * smoothstep(0, 1, u) ** 0.7;
+  if (z < -4.42 || z > 3.0) return 0;
+  if (z < -3.45) {
+    const s = smoothstep(0, 1, clamp01((z + 4.42) / 0.97));
+    w = 0.1 + 0.28 * s ** 0.6;
+    dh = 0.01 + 0.43 * s ** 0.8;
+  } else if (z < -2.4) {
+    const u = clamp01((z + 3.45) / 1.05);
+    w = 0.38 + 0.02 * u;
+    dh = 0.44 - 0.16 * smoothstep(0, 1, u);
   } else {
-    const t = (1 - smoothstep(0, 1, clamp01((z + 2.1) / 5.4))) ** 1.05;
-    dh = 0.005 + 0.435 * t;
-    w = 0.03 + 0.41 * t;
+    const t = (1 - smoothstep(0, 1, clamp01((z + 2.4) / 5.4))) ** 1.1;
+    w = 0.06 + 0.36 * t;
+    dh = 0.005 + 0.275 * t;
   }
   const r = Math.abs(x) / Math.max(w, 1e-3);
   return r >= 1 ? 0 : dh * Math.sqrt(1 - r * r);
 }
 
-/** Upper/lower airframe surface (body + wing) at (x, z) in assembly space. */
+const TAN35 = Math.tan((35 * Math.PI) / 180);
+const TAN14 = Math.tan((14 * Math.PI) / 180);
+
+/** Upper/lower airframe surface (body + trapezoid wing + tailplane) at (x, z) in assembly space. */
 function surface(x: number, z: number): { top: number; bot: number } | null {
   const e = envelope(z);
   const ax = Math.abs(x);
   if (e.hw > 0 && ax < e.hw) {
-    const c = Math.sqrt(1 - (ax / e.hw) ** 2);
-    return { top: 0.03 + (e.top - 0.03) * c ** 0.9 + dorsal(x, z), bot: 0.03 + (e.bot - 0.03) * c ** 0.88 };
+    const r = ax / e.hw;
+    const top = e.chine + (e.top - e.chine) * (1 - r ** 2.6) ** 0.85 + dorsal(x, z);
+    const bot = r >= 0.8 ? e.chine + (e.bot + 0.04 - e.chine) * ((1 - r) / 0.2) : e.bot + 0.04 * (r / 0.8) ** 2;
+    return { top, bot };
   }
-  // Delta wing planform (|x| 0.88..4.65)
-  if (ax >= 0.88 && ax <= 4.9) {
-    const u = clamp01((ax - 0.88) / 3.77);
-    const zLe = -1.55 + 2.98 * u;
-    const zTe = 2.1 + 0.18 * u;
+  if (ax >= 0.95 && ax <= 3.85) {
+    const zLe = Math.min(-1.4 + (ax - 1.05) * TAN35, -3.05 + (ax - 1.0) * 3.6);
+    const zTe = 2.5 - (ax - 1.05) * TAN14;
     if (z >= zLe && z <= zTe) {
+      const u = clamp01((ax - 1.05) / 2.8);
       const f = (z - zLe) / (zTe - zLe);
-      const ht = 0.5 * 0.14 * (1 - 0.65 * u) * Math.sin(Math.PI * f ** 0.86);
-      const yc = 0.03 - 0.015 * u;
+      const ht = 0.5 * 0.15 * (1 - 0.62 * u) * Math.sin(Math.PI * f ** 0.86);
+      const yc = 0.1 - 0.04 * u;
       return { top: yc + ht, bot: yc - ht };
     }
+  }
+  if (ax <= 2.55) {
+    const zLe = 2.8 + (ax - 0.55) * TAN35;
+    if (z >= zLe && z <= 4.7) return { top: 0.03, bot: -0.03 };
   }
   return null;
 }
@@ -128,10 +147,10 @@ function buildVortex(sign: 1 | -1): THREE.Vector3[] {
   const n = 260;
   for (let i = 0; i <= n; i++) {
     const f = i / n;
-    const z = 2.45 + f * 7;
+    const z = 1.8 + f * 7;
     const r = 0.02 + 0.14 * f ** 0.8;
     const a = sign * f * turns * Math.PI * 2;
-    pts.push(new THREE.Vector3(sign * 4.9 + Math.cos(a) * r, BODY_Y + 0.48 + Math.sin(a) * r - 0.25 * f, z));
+    pts.push(new THREE.Vector3(sign * 3.88 + Math.cos(a) * r, BODY_Y + 0.06 + Math.sin(a) * r - 0.25 * f, z));
   }
   return pts;
 }
@@ -161,12 +180,12 @@ export const AirflowStreamlines: React.FC = () => {
       out.push({ points: pts, colors: fadeColors(pts.length, white), speed: 3.4, dash: 2.4 });
     }
     // Over the wings and chines
-    for (const x of [-4.1, -3.3, -2.5, -1.7, -1.05, 1.05, 1.7, 2.5, 3.3, 4.1]) {
+    for (const x of [-3.5, -2.8, -2.1, -1.5, -0.95, 0.95, 1.5, 2.1, 2.8, 3.5]) {
       const pts = buildStreamline(x, 0.06, 1, 0.12);
       out.push({ points: pts, colors: fadeColors(pts.length, white), speed: 3.8, dash: 2.0 });
     }
     // Under belly & wings
-    for (const x of [-2.9, -1.4, -0.5, 0.5, 1.4, 2.9]) {
+    for (const x of [-2.6, -1.3, -0.5, 0.5, 1.3, 2.6]) {
       const pts = buildStreamline(x, 0.07, -1, -0.45);
       out.push({ points: pts, colors: fadeColors(pts.length, cool), speed: 3.0, dash: 2.6 });
     }

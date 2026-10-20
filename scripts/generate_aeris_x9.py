@@ -212,6 +212,7 @@ def add_lofted_sections(
     cap_end: bool = True,
     mat_index: int = 0,
     closed_loop: bool = False,
+    open_ring: bool = False,
 ) -> list[list[bmesh.types.BMVert]]:
     rings: list[list[bmesh.types.BMVert]] = []
     for st in stations:
@@ -226,11 +227,11 @@ def add_lofted_sections(
     for i0, i1 in pairs:
         r0 = rings[i0]
         r1 = rings[i1]
-        for j in range(n_pts):
+        for j in range(n_pts - 1 if open_ring else n_pts):
             jn = (j + 1) % n_pts
             faces.append(bm.faces.new((r0[j], r0[jn], r1[jn], r1[j])))
 
-    if not closed_loop:
+    if not closed_loop and not open_ring:
         if cap_start and len(rings[0]) >= 3:
             faces.append(bm.faces.new(list(reversed(rings[0]))))
         if cap_end and len(rings[-1]) >= 3:
@@ -364,113 +365,6 @@ def add_revolve(
 # 100% SYMMETRICAL C2-CONTINUOUS FUSELAGE & AIRFOIL MATHEMATICS
 # ==============================================================================
 
-def fuselage_envelope(z: float) -> tuple[float, float, float, float]:
-    """
-    Smooth C2-continuous Outer Mold Line (OML) for the AERIS X-9 fuselage
-    from z = -6.50 (nose tip) to z = +4.75 (tail beaver sting).
-    Returns (half_width, deck_top_y, bot_y, chine_y).
-    """
-    if z < -3.30:
-        u = clamp01((z + 6.50) / 3.20)
-        ogive = (u ** 0.85) * (0.70 + 0.30 * smoothstep(0.0, 1.0, u))
-        hw = 0.008 + 0.992 * ogive
-        deck_top_y = -0.05 + 0.43 * ogive
-        bot_y = -0.06 - 0.26 * ogive
-        chine_y = -0.055 + 0.085 * ogive
-    elif z < 2.20:
-        u = clamp01((z + 3.30) / 5.50)
-        mid_swell = math.sin(math.pi * u)
-        hw = 1.00 + 0.22 * mid_swell - 0.08 * smoothstep(0.65, 1.0, u)
-        deck_top_y = 0.38 + 0.04 * mid_swell - 0.05 * smoothstep(0.65, 1.0, u)
-        bot_y = -0.32 - 0.03 * mid_swell + 0.04 * smoothstep(0.70, 1.0, u)
-        chine_y = 0.03 + 0.015 * mid_swell
-    else:
-        u = clamp01((z - 2.20) / 2.55)
-        taper = 1.0 - smoothstep(0.0, 1.0, u) * 0.76
-        hw = 0.92 * taper
-        deck_top_y = 0.33 * taper + 0.03 * (1.0 - taper)
-        bot_y = -0.28 * taper - 0.02 * (1.0 - taper)
-        chine_y = 0.03 * taper + 0.015 * (1.0 - taper)
-    return (hw, deck_top_y, bot_y, chine_y)
-
-
-def fuselage_upper_y_at_x(abs_x: float, z: float) -> float:
-    """
-    Exact Y coordinate on the upper fuselage surface at lateral distance `abs_x` and station `z`.
-    Ensures anything mounted on the dorsal deck (canopy, frame, upper spine) meets the curved
-    fuselage skin with ZERO overhang or gap!
-    """
-    hw, top_y, _, chine_y = fuselage_envelope(z)
-    if hw <= 1e-5:
-        return top_y
-    ratio = clamp01(abs_x / hw)
-    # Since x = hw * sin(theta), cos(theta) = sqrt(1 - ratio^2)
-    cos_t = math.sqrt(max(0.0, 1.0 - ratio * ratio))
-    return chine_y + (top_y - chine_y) * (cos_t ** 0.90)
-
-
-def chine_ring(z: float, scale_inset: float = 1.0) -> list[tuple[float, float, float]]:
-    """
-    24-point strictly bilaterally symmetrical stealth chine cross-section.
-    Constructs the right side (x >= 0) from top-center -> right chine -> bottom-center,
-    then mirrors the interior points (-x, y, z) for the left side so Left and Right
-    are 100.000% identical!
-    """
-    hw, top_y, bot_y, chine_y = fuselage_envelope(z)
-    hw *= scale_inset
-    mid_y = (top_y + bot_y) * 0.5
-    top_y = mid_y + (top_y - mid_y) * scale_inset
-    bot_y = mid_y + (bot_y - mid_y) * scale_inset
-
-    n_half = 12  # 12 segments top->chine, 12 segments chine->bottom => 48 points total
-    right_pts: list[tuple[float, float, float]] = []
-
-    # 1. Top center (k=0) -> Right chine (k=n_half)
-    for k in range(n_half + 1):
-        u = k / float(n_half)
-        theta = u * math.pi * 0.5
-        x = hw * math.sin(theta)
-        y = chine_y + (top_y - chine_y) * (math.cos(theta) ** 0.90)
-        right_pts.append((x, y, z))
-
-    # 2. Right chine (k=1) -> Bottom center (k=n_half)
-    for k in range(1, n_half + 1):
-        u = k / float(n_half)
-        theta = u * math.pi * 0.5
-        x = hw * math.cos(theta)
-        # True elliptical lower belly curve using sin(theta) (NOT cos(theta)!)
-        y = chine_y + (bot_y - chine_y) * (math.sin(theta) ** 0.88)
-        right_pts.append((x, y, z))
-
-    # 3. Mirror interior points (excluding top-center idx 0 and bottom-center idx -1) for Left side (-X)
-    left_pts: list[tuple[float, float, float]] = []
-    for k in range(len(right_pts) - 2, 0, -1):
-        rx, ry, rz = right_pts[k]
-        left_pts.append((-rx, ry, rz))
-
-    return right_pts + left_pts
-
-
-def dorsal_canopy_spine_profile(z: float) -> tuple[float, float]:
-    """
-    Unified dorsal profile from windshield (z = -3.30) over cockpit apex (z = -2.10, height +0.44)
-    tapering smoothly to a razor point at z = +3.30 (width -> 0.02, height -> 0.0).
-    Returns (half_width, ridge_height_above_deck).
-    """
-    hw_body, _, _, _ = fuselage_envelope(z)
-    if z < -2.10:
-        u = clamp01((z + 3.30) / 1.20)
-        rise = smoothstep(0.0, 1.0, u) ** 0.85
-        dh = 0.01 + 0.43 * rise
-        w = 0.08 + 0.36 * (smoothstep(0.0, 1.0, u) ** 0.70)
-    else:
-        u = clamp01((z + 2.10) / 5.40)
-        taper = (1.0 - smoothstep(0.0, 1.0, u)) ** 1.05
-        dh = 0.005 + 0.435 * taper
-        w = 0.03 + 0.41 * taper
-    return (min(w, hw_body * 0.52), dh)
-
-
 def build_dorsal_arch_ring(z: float, extra_w: float = 0.0, extra_y: float = 0.0) -> list[tuple[float, float, float]]:
     """
     16-point bilaterally symmetrical dorsal arch cross-section whose base sits 100% flush
@@ -506,19 +400,6 @@ def build_dorsal_arch_ring(z: float, extra_w: float = 0.0, extra_y: float = 0.0)
         (-w * 0.85, sill_y, z),
     ]
     return right_arch + bottom_pts + left_arch
-
-
-def wing_planform(abs_x: float) -> tuple[float, float, float, float]:
-    """
-    Continuous supersonic swept wing planform for |x| in [0.88, 4.65].
-    Returns (y_center, z_le, z_te, thickness).
-    """
-    u = clamp01((abs_x - 0.88) / (4.65 - 0.88))
-    y_c = 0.03 - 0.015 * u
-    z_le = -1.55 + 2.98 * u
-    z_te = 2.10 + 0.18 * u
-    thick = 0.14 * (1.0 - 0.65 * u)
-    return (y_c, z_le, z_te, thick)
 
 
 def wing_half_thickness_at_chord_frac(f: float, max_thick: float) -> float:
@@ -618,24 +499,6 @@ def add_seam_band(bm, z: float, idx: int, width: float = 0.014, lift: float = 1.
     add_lofted_sections(bm, [chine_ring(z - width * 0.5, lift), chine_ring(z + width * 0.5, lift)], False, False, idx)
 
 
-def add_long_seam(bm, z0: float, z1: float, u: float, side: float, idx: int, steps: int = 10) -> None:
-    """Raised longitudinal seam strip on the upper chine surface at angular fraction u."""
-    stations = []
-    for k in range(steps + 1):
-        z = z0 + (z1 - z0) * k / steps
-        hw, top_y, _, chine_y = fuselage_envelope(z)
-        pts = []
-        for du, dy in ((-0.006, 0.004), (0.006, 0.004), (0.006, -0.004), (-0.006, -0.004)):
-            th = (u + du) * math.pi * 0.5
-            x = side * hw * math.sin(th)
-            y = chine_y + (top_y - chine_y) * (max(0.0, math.cos(th)) ** 0.90)
-            pts.append((x, y + dy, z))
-        if side < 0:
-            pts = list(reversed(pts))
-        stations.append(pts)
-    add_lofted_sections(bm, stations, True, True, idx)
-
-
 def add_blade_antenna(bm, base: tuple[float, float, float], up: float, idx: int) -> None:
     """Swept blade antenna (thin tapered fin)."""
     bx, by, bz = base
@@ -645,195 +508,6 @@ def add_blade_antenna(bm, base: tuple[float, float, float], up: float, idx: int)
         [(bx - 0.003, by + up, bz + 0.02), (bx + 0.003, by + up, bz + 0.02), (bx + 0.003, by + up, bz + 0.08), (bx - 0.003, by + up, bz + 0.08)],
     ]
     add_lofted_sections(bm, stations, True, True, idx)
-
-
-def build_nose_shell(mats: dict) -> bpy.types.Object:
-    """
-    Hollow radome + forward avionics nose: radome joint seam, panel seams, pitot probe,
-    IRST sensor ball, AESA radar array (tiled face on a gimbal) on the rear pressure bulkhead.
-    Slots: 0 skin, 1 dark interior, 2 trim seams, 3 alloy, 4 radar tiles.
-    """
-    bm = bmesh.new()
-    SKIN, DARK, TRIM, ALLOY, TILE = 0, 1, 2, 3, 4
-    z_list = [-6.50 + 3.20 * (i / 21.0) for i in range(22)]
-    add_hollow_shell(bm, z_list[1:], 0.95, SKIN, DARK, close_start=False, close_end=False)
-    # Solid tip cap so the radome reads closed
-    add_lofted_sections(bm, [chine_ring(z_list[0]), chine_ring(z_list[1])], True, False, SKIN)
-    # Seams: radome joint + two avionics bay seams
-    for zs in (-5.05, -4.25, -3.62):
-        add_seam_band(bm, zs, TRIM)
-    for side in (-1.0, 1.0):
-        add_long_seam(bm, -5.0, -3.35, 0.55, side, TRIM, 6)
-    # Pitot probe
-    add_tube(bm, (0.0, -0.05, -6.48), (0.0, -0.05, -6.95), 0.014, 0.008, seg=10, mat_index=ALLOY)
-    add_tube(bm, (0.0, -0.05, -6.95), (0.0, -0.05, -7.08), 0.006, 0.004, seg=8, mat_index=ALLOY)
-    # IRST sensor ball ahead of the windscreen (offset right)
-    _, top_y, _, _ = fuselage_envelope(-3.75)
-    add_revolve(bm, (0.16, top_y - 0.01, -3.75), (0.0, 1.0, 0.0),
-                [(0.0, 0.0), (0.05, 0.0), (0.065, 0.03), (0.055, 0.075), (0.03, 0.095), (0.0, 0.10)],
-                seg=18, closed_profile=False, mat_index=DARK)
-    # Ventral blade antenna
-    _, _, bot_y, _ = fuselage_envelope(-4.2)
-    add_blade_antenna(bm, (0.0, bot_y + 0.005, -4.2), -0.14, TRIM)
-    # Rear pressure bulkhead + AESA array on gimbal yoke
-    add_ring_frame(bm, -3.42, 0.06, 0.95, 0.30, DARK)
-    add_revolve(bm, (0.0, 0.05, -3.55), (0.0, 0.0, -1.0),
-                [(0.0, 0.0), (0.40, 0.0), (0.42, 0.03), (0.40, 0.06), (0.0, 0.06)],
-                seg=32, closed_profile=False, mat_index=ALLOY)
-    for gx in range(-3, 4):
-        for gy in range(-3, 4):
-            cx, cy = gx * 0.095, gy * 0.085
-            if cx * cx + cy * cy > 0.33 ** 2:
-                continue
-            add_box_strip(bm, cx - 0.04, cx + 0.04, 0.05 + cy - 0.036, 0.05 + cy + 0.036, -3.625, -3.612, TILE)
-    add_tube(bm, (0.0, 0.05, -3.45), (0.0, 0.05, -3.55), 0.06, seg=16, mat_index=ALLOY)
-    for sx in (-1.0, 1.0):
-        add_chamfer_prism(bm, (sx * 0.43, 0.05, -3.45), (sx * 0.43, 0.05, -3.60), 0.02, 0.06, 0.01, ALLOY)
-    return finalize_mesh_obj(
-        "AX9__CORE__CENTER__NOSE_SHELL", bm, (0.0, 0.04, -4.90),
-        [mats["skin_primary"], mats["cockpit_dark"], mats["skin_trim"], mats["alloy_mech"], mats["emitter_cyan"]],
-        0.0, True,
-    )
-
-
-def build_main_fuselage(mats: dict) -> bpy.types.Object:
-    """
-    Hollow centre fuselage: thick skin with seams & antennas, ring frames, longerons,
-    avionics racks with status LEDs, wiring looms and a conformal fuel cell.
-    Slots: 0 skin, 1 dark interior liner, 2 trim seams, 3 alloy structure, 4 LEDs, 5 fuel cell.
-    """
-    bm = bmesh.new()
-    SKIN, DARK, TRIM, ALLOY, LED, TANK = 0, 1, 2, 3, 4, 5
-    z_list = [-3.30 + 5.50 * (i / 25.0) for i in range(26)]
-    add_hollow_shell(bm, z_list, 0.955, SKIN, DARK)
-
-    # Exterior seams, longitudinal panel lines, blade antennas, NACA-style vent
-    for zs in (-2.55, -1.05, -0.05, 0.95, 1.85):
-        add_seam_band(bm, zs, TRIM)
-    for side in (-1.0, 1.0):
-        add_long_seam(bm, -3.2, 2.1, 0.78, side, TRIM, 14)
-    _, _, bot_y, _ = fuselage_envelope(-0.6)
-    add_blade_antenna(bm, (0.0, bot_y + 0.005, -0.6), -0.16, TRIM)
-    add_blade_antenna(bm, (0.0, bot_y + 0.005, 1.2), -0.12, TRIM)
-
-    # Structure: ring frames + longerons
-    for z_rib in (-2.95, -2.2, -1.5, -0.75, 0.0, 0.75, 1.5, 2.05):
-        add_ring_frame(bm, z_rib, 0.045, 0.95, 0.80, ALLOY)
-    ring_a = chine_ring(-3.25, 0.90)
-    ring_b = chine_ring(2.15, 0.90)
-    for k in (0, 6, 12, 18, 24, 30, 36, 42):
-        add_tube(bm, ring_a[k], ring_b[k], 0.012, seg=6, mat_index=ALLOY)
-
-    # Avionics racks behind the seat (two stacks) with LED strips + looms
-    for sx in (-1.0, 1.0):
-        for k, (y0, y1) in enumerate(((0.02, 0.12), (0.14, 0.24))):
-            add_chamfer_prism(bm, (sx * 0.20, (y0 + y1) / 2, -1.42), (sx * 0.20, (y0 + y1) / 2, -0.88),
-                              0.13, (y1 - y0) / 2, 0.008, DARK)
-            add_box_strip(bm, sx * 0.08, sx * 0.30, y1 - 0.02, y1 - 0.014, -1.425, -1.415, LED)
-        add_tube(bm, (sx * 0.20, 0.25, -0.86), (sx * 0.12, 0.27, 1.6), 0.018, seg=8, mat_index=DARK)
-        add_tube(bm, (sx * 0.24, 0.22, -0.86), (sx * 0.30, 0.20, 1.6), 0.012, seg=8, mat_index=TRIM)
-
-    # Conformal fuel cell (superelliptic lofted bladder)
-    tank = []
-    for i in range(9):
-        z = -0.55 + 2.45 * i / 8.0
-        sw = math.sin(math.pi * i / 8.0) ** 0.35
-        a, b = 0.34 * sw + 0.02, 0.10 * sw + 0.01
-        ring = []
-        for k in range(20):
-            t = k * 2.0 * math.pi / 20
-            c, s_ = math.cos(t), math.sin(t)
-            ring.append((a * math.copysign(abs(c) ** 0.6, c), 0.17 + b * math.copysign(abs(s_) ** 0.6, s_), z))
-        tank.append(ring)
-    add_lofted_sections(bm, tank, True, True, TANK)
-
-    return finalize_mesh_obj(
-        "AX9__CORE__CENTER__MAIN_FUSELAGE", bm, (0.0, 0.05, -0.55),
-        [mats["skin_primary"], mats["cockpit_dark"], mats["skin_trim"], mats["alloy_mech"],
-         mats["emitter_cyan"], mats["carbon_stealth"]],
-        0.0, True,
-    )
-
-
-def build_rear_fuselage(mats: dict) -> bpy.types.Object:
-    """Hollow aft fuselage with seams, frames and the engine bay firewall."""
-    bm = bmesh.new()
-    SKIN, DARK, TRIM, ALLOY = 0, 1, 2, 3
-    z_list = [2.18 + 2.57 * (i / 16.0) for i in range(17)]
-    add_hollow_shell(bm, z_list, 0.955, SKIN, DARK, close_end=True)
-    for zs in (2.7, 3.4, 4.1):
-        add_seam_band(bm, zs, TRIM)
-    for z_rib in (2.35, 3.0, 3.7):
-        add_ring_frame(bm, z_rib, 0.04, 0.95, 0.78, ALLOY)
-    return finalize_mesh_obj(
-        "AX9__CORE__CENTER__REAR_FUSELAGE", bm, (0.0, 0.05, 3.40),
-        [mats["skin_primary"], mats["cockpit_dark"], mats["skin_trim"], mats["alloy_mech"]],
-        0.0, True,
-    )
-
-
-def build_upper_spine(mats: dict) -> bpy.types.Object:
-    bm = bmesh.new()
-    # Continuous dorsal spine (-0.98m to +3.30m) sitting 100% flush on the curved fuselage deck
-    z_list = [-0.98 + 4.28 * (i / 22.0) for i in range(23)]
-    stations = [build_dorsal_arch_ring(z) for z in z_list]
-    add_lofted_sections(bm, stations)
-    return finalize_mesh_obj("AX9__CORE__CENTER__UPPER_SPINE", bm, (0.0, 0.56, 0.95), mats["skin_trim"], 0.0, True)
-
-
-def build_belly_shell(mats: dict) -> bpy.types.Object:
-    bm = bmesh.new()
-    # Conformal ventral belly fairing (-2.20m to +2.40m) hugging the exact lower fuselage curve
-    z_list = [-2.20 + 4.60 * (i / 18.0) for i in range(19)]
-    stations = []
-    for z in z_list:
-        hw, _, bot_y, chine_y = fuselage_envelope(z)
-        u = (z + 2.20) / 4.60
-        span_frac = 0.25 + 0.30 * math.sin(math.pi * u)
-        # Sample 5 points across the bottom belly arc
-        top_pts = []
-        bot_pts = []
-        for k in range(-2, 3):
-            theta = (k / 2.0) * span_frac * (math.pi * 0.5)
-            x = hw * math.sin(theta)
-            y_surf = chine_y + (bot_y - chine_y) * (math.cos(theta) ** 0.88)
-            top_pts.append((x, y_surf + 0.015, z))
-            bot_pts.append((x, y_surf - 0.002, z))
-        stations.append(top_pts + list(reversed(bot_pts)))
-    add_lofted_sections(bm, stations)
-    return finalize_mesh_obj("AX9__CORE__CENTER__BELLY_SHELL", bm, (0.0, -0.32, 0.10), mats["carbon_stealth"], 0.0, True)
-
-
-def build_canopy_glass(mats: dict) -> bpy.types.Object:
-    bm = bmesh.new()
-    # Forward portion of the unified dorsal arch (-3.30m to -0.98m) flush with fuselage deck
-    z_list = [-3.30 + 2.32 * (i / 20.0) for i in range(21)]
-    stations = [build_dorsal_arch_ring(z) for z in z_list]
-    add_lofted_sections(bm, stations)
-    return finalize_mesh_obj("AX9__CANOPY__CENTER__CANOPY_GLASS", bm, (0.0, 0.64, -2.14), mats["canopy_glass"], 0.0, True)
-
-
-def build_canopy_frame(mats: dict) -> bpy.types.Object:
-    bm = bmesh.new()
-    # Thin conformal canopy sill trim hugging the exact base of the canopy on the curved fuselage deck
-    z_list = [-3.30 + 2.32 * (i / 18.0) for i in range(19)]
-    for side in (-1.0, 1.0):
-        sill_st = []
-        for z in z_list:
-            w, _ = dorsal_canopy_spine_profile(z)
-            w = max(0.02, w)
-            y_in = fuselage_upper_y_at_x(max(0.0, w - 0.015), z)
-            y_out = fuselage_upper_y_at_x(w + 0.018, z)
-            sill_st.append([
-                (side * (w - 0.015), y_in + 0.018, z),
-                (side * (w + 0.018), y_out + 0.008, z),
-                (side * (w + 0.018), y_out - 0.012, z),
-                (side * (w - 0.015), y_in - 0.012, z),
-            ])
-        if side < 0:
-            sill_st = [list(reversed(st)) for st in sill_st]
-        add_lofted_sections(bm, sill_st)
-    return finalize_mesh_obj("AX9__CANOPY__CENTER__CANOPY_FRAME", bm, (0.0, 0.42, -2.14), mats["carbon_stealth"], 0.0, True)
 
 
 def build_display_plate(mats: dict) -> bpy.types.Object:
@@ -893,121 +567,16 @@ def build_display_plate(mats: dict) -> bpy.types.Object:
                 [(0.0, 0.0), (0.045, 0.0), (0.035, 0.03), (0.012, 0.035), (0.0, 0.035)],
                 seg=16, closed_profile=False, mat_index=TUB)  # stick boot
 
+    COCKPIT_DZ = -1.05
+    bmesh.ops.translate(bm, vec=t2b(0.0, 0.10, COCKPIT_DZ), verts=bm.verts)
     return finalize_mesh_obj(
         "AX9__CANOPY__CENTER__DISPLAY_PLATE",
         bm,
-        (0.0, 0.48, -2.30),
+        (0.0, 0.58, -2.30 + COCKPIT_DZ),
         [mats["cockpit_dark"], mats["emitter_cyan"], mats["seat_cushion"], mats["alloy_mech"], mats["hazard"]],
         0.0,
         True,
     )
-
-
-def _intake_section(side: int, z: float, scale: float) -> list[tuple[float, float, float]]:
-    """24-point superelliptical intake section that follows the chine envelope at station z."""
-    s = float(side)
-    hw_env, _, bot_y, chine_y = fuselage_envelope(z)
-    u = clamp01((z + 2.10) / 3.20)
-    swell = math.sin(math.pi * u)
-    x_in = 0.32
-    x_out = hw_env * (0.72 + 0.12 * swell)
-    y_top = chine_y - 0.02
-    y_bot = bot_y - 0.03 * swell
-    cx = s * (x_in + x_out) * 0.5
-    cy = (y_top + y_bot) * 0.5
-    a = (x_out - x_in) * 0.5 * scale
-    b = (y_top - y_bot) * 0.5 * scale
-    pts = []
-    n = 24
-    for k in range(n):
-        t = k * (2.0 * math.pi / n)
-        c, sn = math.cos(t), math.sin(t)
-        px = a * math.copysign(abs(c) ** 0.55, c)
-        py = b * math.copysign(abs(sn) ** 0.55, sn)
-        pts.append((cx + px, cy + py, z))
-    if side < 0:
-        pts = list(reversed(pts))
-    return pts
-
-
-def build_intake_shell(side: int, node_name: str, mats: dict) -> bpy.types.Object:
-    """
-    Hollow chine intake: rounded outer cowl, raked lip, inner S-duct liner ending on a dark
-    compressor face, plus a boundary-layer splitter plate standing off the fuselage wall.
-    Material slots: 0 cowl trim, 1 dark duct interior.
-    """
-    bm = bmesh.new()
-    s = float(side)
-    z_outer = [-2.10, -1.80, -1.40, -0.95, -0.50, 0.00, 0.55, 1.10]
-    outer = add_lofted_sections(bm, [_intake_section(side, z, 1.0) for z in z_outer], False, True, 0)
-    z_inner = [-2.06, -1.85, -1.60, -1.35]
-    inner_st = [_intake_section(side, z, 0.84 - 0.06 * i) for i, z in enumerate(z_inner)]
-    inner = add_lofted_sections(bm, inner_st, False, True, 1)
-    # Lip joining cowl to liner
-    n = len(outer[0])
-    for j in range(n):
-        jn = (j + 1) % n
-        bm.faces.new((outer[0][j], outer[0][jn], inner[0][jn], inner[0][j])).material_index = 0
-    # Boundary-layer splitter plate
-    add_chamfer_prism(bm, (s * 0.285, -0.15, -2.24), (s * 0.285, -0.15, -1.30), 0.006, 0.15, 0.004, 0,
-                      hh_end=0.13)
-    for zz in (-2.0, -1.6):
-        add_box_strip(bm, s * 0.29, s * 0.33, -0.17, -0.13, zz, zz + 0.05, 0)
-    return finalize_mesh_obj(node_name, bm, (s * 0.68, -0.16, -0.50), [mats["skin_trim"], mats["cockpit_dark"]], 0.0, True)
-
-
-def build_exhaust_ring(side: int, node_name: str, mats: dict) -> bpy.types.Object:
-    """16 serrated nozzle petals + inner liner, turbine face and afterburner flame-holder ring."""
-    bm = bmesh.new()
-    s = float(side)
-    xc = s * 0.50
-    yc = 0.02
-    n_petals = 16
-    for k in range(n_petals):
-        a0 = (k + 0.04) * (2.0 * math.pi / n_petals)
-        a1 = (k + 0.96) * (2.0 * math.pi / n_petals)
-        amid = (a0 + a1) * 0.5
-        r_base_out, r_base_in = 0.30, 0.25
-        r_tip_out, r_tip_in = 0.23, 0.18
-        pts = [
-            (xc + math.cos(a0) * r_base_in, yc + math.sin(a0) * r_base_in * 0.88, 3.65),
-            (xc + math.cos(a1) * r_base_in, yc + math.sin(a1) * r_base_in * 0.88, 3.65),
-            (xc + math.cos(a1) * r_base_out, yc + math.sin(a1) * r_base_out * 0.88, 3.65),
-            (xc + math.cos(a0) * r_base_out, yc + math.sin(a0) * r_base_out * 0.88, 3.65),
-            (xc + math.cos(a0) * r_tip_in, yc + math.sin(a0) * r_tip_in * 0.88, 4.44),
-            (xc + math.cos(a1) * r_tip_in, yc + math.sin(a1) * r_tip_in * 0.88, 4.44),
-            (xc + math.cos(amid) * r_tip_out, yc + math.sin(amid) * r_tip_out * 0.88, 4.55),
-            (xc + math.cos(a0) * r_tip_out, yc + math.sin(a0) * r_tip_out * 0.88, 4.44),
-        ]
-        v = [bm.verts.new(t2b(*p)) for p in pts]
-        bm.faces.new((v[0], v[3], v[2], v[1]))
-        bm.faces.new((v[4], v[5], v[6], v[7]))
-        bm.faces.new((v[3], v[7], v[6], v[2]))
-        bm.faces.new((v[0], v[1], v[5], v[4]))
-        bm.faces.new((v[1], v[2], v[6], v[5]))
-        bm.faces.new((v[3], v[0], v[4], v[7]))
-    # Inner liner, turbine face (cap at the forward end) and flame-holder torus
-    add_tube(bm, (xc, yc, 3.58), (xc, yc, 4.30), 0.205, 0.17, seg=24, cap=False, mat_index=1)
-    add_revolve(bm, (xc, yc, 3.60), (0.0, 0.0, 1.0),
-                [(0.0, 0.0), (0.205, 0.0), (0.06, -0.06), (0.0, -0.07)], seg=24, closed_profile=False, mat_index=1)
-    add_revolve(bm, (xc, yc, 3.78), (0.0, 0.0, 1.0),
-                [(0.10, -0.012), (0.125, -0.012), (0.125, 0.012), (0.10, 0.012)], seg=24, mat_index=0)
-    for k in range(6):
-        ang = k * (math.pi / 3.0)
-        add_tube(bm, (xc, yc, 3.78), (xc + math.cos(ang) * 0.11, yc + math.sin(ang) * 0.11, 3.78),
-                 0.007, seg=6, mat_index=0)
-    return finalize_mesh_obj(node_name, bm, (xc, yc, 4.10), [mats["nozzle_ceramic"], mats["cockpit_dark"]], 0.0, True)
-
-
-def build_tip_light(side: int, node_name: str, mats: dict) -> bpy.types.Object:
-    """Teardrop navigation-light lens on the winglet tip (red port / green starboard)."""
-    bm = bmesh.new()
-    s = float(side)
-    profile = [(0.0, 0.0), (0.020, 0.04), (0.034, 0.14), (0.034, 0.30), (0.022, 0.42), (0.0, 0.46)]
-    add_revolve(bm, (s * 4.90, 0.46, 1.90), (0.0, 0.0, 1.0),
-                [(r * 1.0, a) for r, a in profile], seg=16, closed_profile=False, mat_index=0)
-    return finalize_mesh_obj(node_name, bm, (s * 4.90, 0.46, 2.13),
-                             mats["nav_red"] if side < 0 else mats["nav_green"], 0.0, True)
 
 
 def build_gear_assembly(g_side, strut_piv, wheel_piv, door_box, w_rad, w_hw, mats, created_objects) -> None:
@@ -1107,178 +676,558 @@ def build_gear_assembly(g_side, strut_piv, wheel_piv, door_box, w_rad, w_hw, mat
     created_objects[d_name] = finalize_mesh_obj(d_name, bm_door, door_piv, [mats["carbon_stealth"], mats["alloy_mech"]], 0.0, True)
 
 
+# ==============================================================================
+# v8 STEALTH-FIGHTER OML (5th-gen proportions: chined nose, flat blended top, caret DSI
+# intakes beside the cockpit, trapezoid wing with aligned edges, canted twin tails,
+# single serrated nozzle). Three.js assembly space: x right, y up, z aft, nose at z=-6.5.
+# ==============================================================================
+
+TAN35 = math.tan(math.radians(35.0))
+TAN14 = math.tan(math.radians(14.0))
+
+NOSE_END_Z = -4.55
+MAIN_END_Z = 2.20
+TAIL_END_Z = 4.05
+NOZZLE_C = (0.0, -0.01)
+
+
+def _seg(z: float, z0: float, z1: float, a: tuple, b: tuple) -> tuple:
+    t = smoothstep(z0, z1, z)
+    return tuple(av + (bv - av) * t for av, bv in zip(a, b))
+
+
+def fuselage_envelope(z: float) -> tuple[float, float, float, float]:
+    """(half_width, top_y, bottom_y, chine_y) of the blended stealth fuselage at station z."""
+    # key stations: (hw, top, bot, chine)
+    tip = (0.012, -0.02, -0.04, -0.03)
+    radome = (0.64, 0.38, -0.34, -0.03)
+    cockpit = (0.76, 0.50, -0.46, 0.02)
+    mid = (1.16, 0.58, -0.56, 0.08)
+    aft = (1.09, 0.55, -0.52, 0.07)
+    tail = (0.54, 0.44, -0.44, 0.00)
+    if z < NOSE_END_Z:
+        u = clamp01((z + 6.50) / (NOSE_END_Z + 6.50))
+        o = u ** 0.72
+        return tuple(a + (b - a) * o for a, b in zip(tip, radome))
+    if z < -3.20:
+        return _seg(z, NOSE_END_Z, -3.20, radome, cockpit)
+    if z < -0.60:
+        return _seg(z, -3.20, -0.60, cockpit, mid)
+    if z < MAIN_END_Z:
+        return _seg(z, -0.60, MAIN_END_Z, mid, aft)
+    return _seg(z, MAIN_END_Z, TAIL_END_Z + 0.05, aft, tail)
+
+
+def _upper_y(r: float, top_y: float, chine_y: float) -> float:
+    """Flat top with rounded shoulders, dropping sharply onto the chine at r=1."""
+    r = clamp01(r)
+    return chine_y + (top_y - chine_y) * (1.0 - r ** 2.6) ** 0.85
+
+
+def _lower_y(r: float, bot_y: float, chine_y: float) -> float:
+    """Inward-canted lower side facet (chine -> r=0.80) then a near-flat belly."""
+    r = clamp01(r)
+    flat_y = bot_y + 0.04
+    if r >= 0.80:
+        return chine_y + (flat_y - chine_y) * ((1.0 - r) / 0.20)
+    return bot_y + 0.04 * (r / 0.80) ** 2
+
+
+def fuselage_upper_y_at_x(abs_x: float, z: float) -> float:
+    hw, top_y, _, chine_y = fuselage_envelope(z)
+    if hw <= 1e-5:
+        return top_y
+    return _upper_y(abs_x / hw, top_y, chine_y)
+
+
+def fuselage_lower_y_at_x(abs_x: float, z: float) -> float:
+    hw, _, bot_y, chine_y = fuselage_envelope(z)
+    if hw <= 1e-5:
+        return bot_y
+    return _lower_y(abs_x / hw, bot_y, chine_y)
+
+
+def chine_ring(z: float, scale_inset: float = 1.0) -> list[tuple[float, float, float]]:
+    """48-point bilaterally symmetric faceted section (sharp chine at |x| = hw)."""
+    hw, top_y, bot_y, chine_y = fuselage_envelope(z)
+    mid_y = (top_y + bot_y) * 0.5
+    right: list[tuple[float, float, float]] = []
+    n = 12
+    for k in range(n + 1):  # top centre -> chine
+        r = math.sin((k / n) * math.pi * 0.5)
+        right.append((hw * r, _upper_y(r, top_y, chine_y), z))
+    for k in range(1, n + 1):  # chine -> bottom centre
+        r = math.cos((k / n) * math.pi * 0.5)
+        right.append((hw * r, _lower_y(r, bot_y, chine_y), z))
+    if scale_inset != 1.0:
+        right = [(x * scale_inset, mid_y + (y - mid_y) * scale_inset, zz) for x, y, zz in right]
+    left = [(-x, y, zz) for x, y, zz in reversed(right[1:-1])]
+    return right + left
+
+
+def dorsal_canopy_spine_profile(z: float) -> tuple[float, float]:
+    """(half_width, height above deck): bubble canopy (-4.42..-2.40) flowing into a broad dorsal hump."""
+    if z < -4.42 or z > 3.0:
+        return (0.02, 0.0)
+    if z < -3.45:
+        u = clamp01((z + 4.42) / 0.97)
+        s = smoothstep(0.0, 1.0, u)
+        return (0.10 + 0.28 * s ** 0.6, 0.01 + 0.43 * s ** 0.8)
+    if z < -2.40:
+        u = clamp01((z + 3.45) / 1.05)
+        return (0.38 + 0.02 * u, 0.44 - 0.16 * smoothstep(0.0, 1.0, u))
+    u = clamp01((z + 2.40) / 5.40)
+    t = (1.0 - smoothstep(0.0, 1.0, u)) ** 1.1
+    return (0.06 + 0.36 * t, 0.005 + 0.275 * t)
+
+
+def wing_planform(abs_x: float) -> tuple[float, float, float, float]:
+    """Trapezoid wing (|x| 0.95..3.85): LE sweep 35 deg, TE sweep -14 deg, LEX blending to the intake."""
+    ax = max(0.95, min(3.85, abs_x))
+    z_le = -1.40 + (ax - 1.05) * TAN35
+    z_le = min(z_le, -3.05 + (ax - 1.0) * 3.6)  # leading-edge extension along the intake shoulder
+    z_te = 2.50 - (ax - 1.05) * TAN14
+    u = clamp01((ax - 1.05) / 2.80)
+    y_c = 0.10 - 0.04 * u
+    thick = 0.15 * (1.0 - 0.62 * u)
+    return (y_c, z_le, z_te, thick)
+
+
 def build_wing(side: int, node_name: str, mats: dict) -> bpy.types.Object:
     bm = bmesh.new()
     s = float(side)
-    # Main wing structural box from root (|x|=0.88) to wingtip (|x|=4.65)
-    x_list = [0.88, 1.25, 2.05, 2.90, 3.75, 4.40, 4.65]
+    x_list = [0.95, 1.08, 1.22, 1.38, 1.6, 2.0, 2.6, 3.2, 3.85]
     stations = [build_wing_slice_ring(side, ax, 0.0, 1.0) for ax in x_list]
-    # Smoothly canted upturned winglet
-    stations.append(build_wing_slice_ring(side, 4.80, 0.0, 1.0, 0.24, 1.62, 2.32, 0.042))
-    stations.append(build_wing_slice_ring(side, 4.92, 0.0, 1.0, 0.48, 1.85, 2.38, 0.026))
-
     if side < 0:
         stations = [list(reversed(st)) for st in stations]
     add_lofted_sections(bm, stations)
-    return finalize_mesh_obj(node_name, bm, (s * 2.85, 0.04, 0.80), mats["skin_primary"], 0.0, True)
+    return finalize_mesh_obj(node_name, bm, (s * 2.4, 0.08, 0.9), mats["skin_primary"], 0.0, True)
 
 
 def build_leading_slat(side: int, node_name: str, mats: dict) -> bpy.types.Object:
-    """
-    Razor-sharp conformal leading-edge slat wrapping the forward 18% chord (f = 0.0 .. 0.18)
-    of the exact wing airfoil with a 0.8mm conformal skin offset — ZERO cylindrical tubes!
-    """
     bm = bmesh.new()
     s = float(side)
-    x_list = [1.25, 2.05, 2.90, 3.75, 4.40]
     stations = []
-    for ax in x_list:
+    for ax in [1.62, 2.2, 2.8, 3.35, 3.8]:
         yc, z_le, z_te, thick = wing_planform(ax)
-        stations.append(build_wing_slice_ring(side, ax, 0.0, 0.18, yc, z_le - 0.002, z_te, thick + 0.002))
+        stations.append(build_wing_slice_ring(side, ax, 0.0, 0.16, yc, z_le - 0.002, z_te, thick + 0.002))
     if side < 0:
         stations = [list(reversed(st)) for st in stations]
     add_lofted_sections(bm, stations)
-    return finalize_mesh_obj(node_name, bm, (s * 2.82, 0.03, 0.02), mats["skin_trim"], 0.0, True)
+    return finalize_mesh_obj(node_name, bm, (s * 2.7, 0.08, 0.2), mats["skin_trim"], 0.0, True)
 
 
 def build_elevon(side: int, node_name: str, mats: dict) -> bpy.types.Object:
-    """
-    Razor-sharp conformal trailing-edge flaperon wrapping the aft 22% chord (f = 0.78 .. 1.0)
-    of the exact wing airfoil with a 0.8mm conformal skin offset — ZERO gaps or steps!
-    """
+    """Inboard flaperon on the aft 24% chord."""
     bm = bmesh.new()
     s = float(side)
-    x_list = [1.25, 2.05, 2.90, 3.75, 4.40]
     stations = []
-    for ax in x_list:
+    for ax in [1.25, 1.8, 2.35, 2.85]:
         yc, z_le, z_te, thick = wing_planform(ax)
-        stations.append(build_wing_slice_ring(side, ax, 0.78, 1.0, yc, z_le, z_te + 0.002, thick + 0.002))
+        stations.append(build_wing_slice_ring(side, ax, 0.76, 1.0, yc, z_le, z_te + 0.002, thick + 0.002))
     if side < 0:
         stations = [list(reversed(st)) for st in stations]
     add_lofted_sections(bm, stations)
-    return finalize_mesh_obj(node_name, bm, (s * 2.82, 0.03, 2.00), mats["skin_trim"], 0.0, True)
+    return finalize_mesh_obj(node_name, bm, (s * 2.05, 0.08, 2.2), mats["skin_trim"], 0.0, True)
 
 
 def build_stabilizer(side: int, node_name: str, mats: dict) -> bpy.types.Object:
-    """
-    Horizontal tailplane rooted deeply into the rear fuselage chine (|x| = 0.52 .. 2.42).
-    """
+    """All-moving trapezoid tailplane, edges parallel to the wing."""
     bm = bmesh.new()
     s = float(side)
-    stations = [
-        build_wing_slice_ring(side, 0.52, 0.0, 1.0, 0.03, 2.68, 4.05, 0.095),
-        build_wing_slice_ring(side, 1.48, 0.0, 1.0, 0.025, 3.20, 4.18, 0.068),
-        build_wing_slice_ring(side, 2.42, 0.0, 1.0, 0.02, 3.68, 4.28, 0.038),
-    ]
+    specs = [(0.55, 2.80, 4.55, 0.09), (1.4, 2.80 + 0.85 * TAN35, 4.62, 0.065), (2.55, 2.80 + 2.0 * TAN35, 4.70, 0.035)]
+    stations = [build_wing_slice_ring(side, ax, 0.0, 1.0, 0.0, zl, zt, th) for ax, zl, zt, th in specs]
     if side < 0:
         stations = [list(reversed(st)) for st in stations]
     add_lofted_sections(bm, stations)
-    return finalize_mesh_obj(node_name, bm, (s * 1.55, 0.025, 3.65), mats["carbon_stealth"], 0.0, True)
+    return finalize_mesh_obj(node_name, bm, (s * 1.55, 0.0, 3.9), mats["carbon_stealth"], 0.0, True)
 
 
 def build_fin(side: int, node_name: str, mats: dict) -> bpy.types.Object:
-    """
-    True symmetrical airfoil twin canted vertical stabilizer (canted 20 deg outward).
-    """
+    """Twin vertical tail canted 25 deg outboard, swept LE, mounted on the fuselage shoulders."""
     bm = bmesh.new()
     s = float(side)
-    cant_rad = math.radians(20.0)
-    nx = s * math.cos(cant_rad)
-    ny = -math.sin(cant_rad)
-
-    fin_specs = [
-        (0.62, 0.24, 1.90, 3.85, 0.10),
-        (0.98, 1.04, 2.48, 4.00, 0.072),
-        (1.32, 1.80, 3.05, 4.14, 0.040),
-    ]
-    vert_stations = []
-    for x_c, y_c, z_le, z_te, thick in fin_specs:
-        base_ring = build_wing_slice_ring(1, 0.0, 0.0, 1.0, 0.0, z_le, z_te, thick)
-        ring = []
-        for _, offset_n, pz in base_ring:
-            px = s * x_c + nx * offset_n
-            py = y_c + ny * offset_n
-            ring.append((px, py, pz))
-        vert_stations.append(ring)
-
-    if side < 0:
-        vert_stations = [list(reversed(st)) for st in vert_stations]
-    add_lofted_sections(bm, vert_stations)
-    return finalize_mesh_obj(node_name, bm, (s * 0.98, 1.04, 3.15), mats["skin_primary"], 0.0, True)
-
-
-def build_rear_shroud(side: int, node_name: str, mats: dict) -> bpy.types.Object:
-    bm = bmesh.new()
-    s = float(side)
-    xc = s * 0.50
-    yc = 0.02
-    # Smoothly faired twin engine nacelle (+0.80m to +3.68m): starts tapered inside the fuselage
-    # at z=+0.80 so there is ZERO blunt cylinder wall sticking out in Top view!
-    z_list = [0.80 + 2.88 * (i / 14.0) for i in range(15)]
+    cant = math.radians(25.0)
+    base_x = 0.80
+    base_y = fuselage_upper_y_at_x(base_x, 2.9) - 0.05
+    specs = [(0.0, 1.95, 3.85, 0.095), (0.8, 1.95 + 0.8 * 0.78, 3.90, 0.065), (1.6, 1.95 + 1.6 * 0.78, 3.98, 0.035)]
+    nx = s * math.cos(cant)
+    ny = -math.sin(cant)
     stations = []
-    for z in z_list:
-        u = (z - 0.80) / 2.88
-        front_blend = smoothstep(0.0, 0.35, u)
-        rear_taper = 1.0 - 0.08 * smoothstep(0.65, 1.0, u)
-        rx = (0.16 + 0.17 * front_blend) * rear_taper
-        ry = (0.14 + 0.15 * front_blend) * rear_taper
+    for h, z_le, z_te, thick in specs:
+        cx = s * (base_x + h * math.sin(cant))
+        cy = base_y + h * math.cos(cant)
         ring = []
-        for k in range(20):
-            ang = k * (2.0 * math.pi / 20.0)
-            ring.append((xc + math.cos(ang) * rx, yc + math.sin(ang) * ry, z))
+        for _, off, pz in build_wing_slice_ring(1, 0.0, 0.0, 1.0, 0.0, z_le, z_te, thick):
+            ring.append((cx + nx * off, cy + ny * off, pz))
         stations.append(ring)
-    add_lofted_sections(bm, stations)
-    return finalize_mesh_obj(node_name, bm, (xc, yc, 2.40), mats["carbon_stealth"], 0.0, True)
-
-
-def build_conformal_service_panel(
-    side: int,
-    idx: int,
-    node_name: str,
-    z_start: float,
-    z_end: float,
-    mats: dict,
-) -> bpy.types.Object:
-    """
-    100% bilaterally symmetrical conformal skin panel hugging the exact `chine_ring` upper
-    surface (`u` from 2/6 to 4/6 of the upper chine) with 0.8mm outer flushness.
-    """
-    bm = bmesh.new()
-    s = float(side)
-    z_steps = [z_start + (z_end - z_start) * (k / 5.0) for k in range(6)]
-    stations = []
-    u_in = 2.0 / 6.0
-    u_mid = 3.0 / 6.0
-    u_out = 4.0 / 6.0
-
-    for z in z_steps:
-        hw, top_y, _, chine_y = fuselage_envelope(z)
-
-        def pt_on_upper_chine(u: float, offset_y: float) -> tuple[float, float, float]:
-            theta = u * math.pi * 0.5
-            x = s * hw * math.sin(theta)
-            y = chine_y + (top_y - chine_y) * (math.cos(theta) ** 0.90)
-            return (x, y + offset_y, z)
-
-        p_in_top = pt_on_upper_chine(u_in, 0.0008)
-        p_mid_top = pt_on_upper_chine(u_mid, 0.0008)
-        p_out_top = pt_on_upper_chine(u_out, 0.0008)
-        p_out_bot = pt_on_upper_chine(u_out, -0.012)
-        p_mid_bot = pt_on_upper_chine(u_mid, -0.012)
-        p_in_bot = pt_on_upper_chine(u_in, -0.012)
-        stations.append([p_in_top, p_mid_top, p_out_top, p_out_bot, p_mid_bot, p_in_bot])
-
     if side < 0:
         stations = [list(reversed(st)) for st in stations]
     add_lofted_sections(bm, stations)
+    return finalize_mesh_obj(node_name, bm, (s * 1.1, base_y + 0.7, 3.2), mats["skin_primary"], 0.0, True)
 
+
+def _intake_params(z: float) -> tuple[float, float, float, float, float]:
+    """(x_inner, x_outer_top, x_outer_bot, y_top, y_bot) of the caret intake at station z."""
+    hw = fuselage_envelope(min(z, -3.2))[0]
+    u = clamp01((z + 3.30) / 2.6)
+    xi = hw - 0.01
+    return (xi, xi + 0.50 - 0.06 * u, xi + 0.38 - 0.04 * u, 0.16 - 0.02 * u, -0.40 + 0.05 * u)
+
+
+def _intake_poly(side: int, z: float, scale: float = 1.0, rake: bool = False) -> list[tuple[float, float, float]]:
+    s = float(side)
+    xi, xot, xob, yt, yb = _intake_params(z)
+    pts2 = [
+        (xi + 0.02, yt), (xot - 0.03, yt), (xot, yt - 0.03), (xob, yb + 0.03),
+        (xob - 0.03, yb), (xi + 0.02, yb), (xi, yb + 0.02), (xi, yt - 0.02),
+    ]
+    cx = sum(p[0] for p in pts2) / len(pts2)
+    cy = sum(p[1] for p in pts2) / len(pts2)
+    out = []
+    for x, y in pts2:
+        px = cx + (x - cx) * scale
+        py = cy + (y - cy) * scale
+        pz = z
+        if rake:
+            # Caret lip: top/inner edge forward, bottom/outer edge swept aft
+            pz = z + 0.24 * (yt - py) / (yt - yb) + 0.14 * (px - xi) / (xot - xi)
+        out.append((s * px, py, pz))
+    if side < 0:
+        out = list(reversed(out))
+    return out
+
+
+def build_intake_shell(side: int, node_name: str, mats: dict) -> bpy.types.Object:
+    """
+    Caret inlet beside the cockpit: raked forward-swept lip, hollow duct ending on a dark
+    compressor face, and the diverterless (DSI) bump on the fuselage wall ahead of it.
+    Slots: 0 cowl trim, 1 dark duct interior.
+    """
+    bm = bmesh.new()
+    s = float(side)
+    z_lip = -3.30
+    z_outer = [z_lip, -2.9, -2.4, -1.9, -1.4, -0.9]
+    outer_st = [_intake_poly(side, z_lip, 1.0, True)] + [_intake_poly(side, z) for z in z_outer[1:]]
+    outer = add_lofted_sections(bm, outer_st, False, True, 0)
+    inner_st = [_intake_poly(side, z_lip, 0.84, True)] + [_intake_poly(side, z, 0.84 - 0.05 * i) for i, z in enumerate([-3.0, -2.7, -2.45], 1)]
+    inner = add_lofted_sections(bm, inner_st, False, True, 1)
+    n = len(outer[0])
+    for j in range(n):
+        jn = (j + 1) % n
+        bm.faces.new((outer[0][j], outer[0][jn], inner[0][jn], inner[0][j])).material_index = 0
+    # DSI bump: smooth blister on the fuselage side just ahead of the lip
+    bump = []
+    for i in range(9):
+        z = -3.95 + 0.85 * i / 8.0
+        hw = fuselage_envelope(z)[0]
+        b = 0.11 * math.sin(math.pi * i / 8.0) ** 0.8
+        ring = []
+        for k in range(9):
+            t = -math.pi / 2 + math.pi * k / 8.0
+            ring.append((s * (hw - 0.01 + b * math.cos(t)), -0.10 + 0.20 * math.sin(t), z))
+        if side < 0:
+            ring = list(reversed(ring))
+        bump.append(ring)
+    add_lofted_sections(bm, bump, False, False, 0, open_ring=True)
+    return finalize_mesh_obj(node_name, bm, (s * 0.95, -0.08, -2.4), [mats["skin_trim"], mats["cockpit_dark"]], 0.0, True)
+
+
+def _half_arc(side: int, cx: float, cy: float, r: float, z: float, n: int = 12) -> list[tuple[float, float, float]]:
+    """Half circle on the given side (x>=cx for right), ordered bottom -> top."""
+    s = float(side)
+    return [(cx + s * r * math.cos(t), cy + r * math.sin(t), z)
+            for t in (-math.pi / 2 + math.pi * k / n for k in range(n + 1))]
+
+
+def build_rear_shroud(side: int, node_name: str, mats: dict) -> bpy.types.Object:
+    """Half of the single engine casing (split down the centreline) with stiffening rings."""
+    bm = bmesh.new()
+    cx, cy = NOZZLE_C
+    stations = []
+    for i in range(12):
+        z = 0.20 + 3.85 * i / 11.0
+        r_out = 0.36 + 0.05 * smoothstep(0.0, 0.3, i / 11.0)
+        outer = _half_arc(side, cx, cy, r_out, z)
+        inner = _half_arc(side, cx, cy, r_out - 0.03, z)
+        ring = outer + list(reversed(inner))
+        if side < 0:
+            ring = list(reversed(ring))
+        stations.append(ring)
+    add_lofted_sections(bm, stations, True, True, 0)
+    for zr in (0.6, 1.4, 2.2, 3.0, 3.7):
+        ring = _half_arc(side, cx, cy, 0.425, zr - 0.03) + list(reversed(_half_arc(side, cx, cy, 0.40, zr - 0.03)))
+        ring2 = _half_arc(side, cx, cy, 0.425, zr + 0.03) + list(reversed(_half_arc(side, cx, cy, 0.40, zr + 0.03)))
+        if side < 0:
+            ring, ring2 = list(reversed(ring)), list(reversed(ring2))
+        add_lofted_sections(bm, [ring, ring2], True, True, 1)
+    return finalize_mesh_obj(node_name, bm, (side * 0.2, cy, 2.1), [mats["carbon_stealth"], mats["alloy_mech"]], 0.0, True)
+
+
+def build_exhaust_ring(side: int, node_name: str, mats: dict) -> bpy.types.Object:
+    """Half of the single serrated (sawtooth) nozzle: 8 petals, inner liner, turbine face, flame holder."""
+    bm = bmesh.new()
+    cx, cy = NOZZLE_C
+    n_total = 16
+    ks = range(0, 8) if side > 0 else range(8, 16)
+    for k in ks:
+        a0 = -math.pi / 2 + (k + 0.04) * (2.0 * math.pi / n_total)
+        a1 = -math.pi / 2 + (k + 0.96) * (2.0 * math.pi / n_total)
+        amid = (a0 + a1) * 0.5
+        rbo, rbi, rto, rti = 0.46, 0.40, 0.38, 0.33
+        z0, z1, z2 = 4.00, 4.58, 4.74
+        pts = [
+            (cx + math.cos(a0) * rbi, cy + math.sin(a0) * rbi, z0),
+            (cx + math.cos(a1) * rbi, cy + math.sin(a1) * rbi, z0),
+            (cx + math.cos(a1) * rbo, cy + math.sin(a1) * rbo, z0),
+            (cx + math.cos(a0) * rbo, cy + math.sin(a0) * rbo, z0),
+            (cx + math.cos(a0) * rti, cy + math.sin(a0) * rti, z1),
+            (cx + math.cos(a1) * rti, cy + math.sin(a1) * rti, z1),
+            (cx + math.cos(amid) * rto, cy + math.sin(amid) * rto, z2),
+            (cx + math.cos(a0) * rto, cy + math.sin(a0) * rto, z1),
+        ]
+        v = [bm.verts.new(t2b(*p)) for p in pts]
+        bm.faces.new((v[0], v[3], v[2], v[1]))
+        bm.faces.new((v[4], v[5], v[6], v[7]))
+        bm.faces.new((v[3], v[7], v[6], v[2]))
+        bm.faces.new((v[0], v[1], v[5], v[4]))
+        bm.faces.new((v[1], v[2], v[6], v[5]))
+        bm.faces.new((v[3], v[0], v[4], v[7]))
+    # Inner liner (half tube), turbine face (half disc) and flame-holder half ring
+    liner = [_half_arc(side, cx, cy, r, z) for r, z in ((0.39, 3.92), (0.34, 4.50))]
+    if side < 0:
+        liner = [list(reversed(r)) for r in liner]
+    add_lofted_sections(bm, liner, False, False, 1, open_ring=True)
+    face = [_half_arc(side, cx, cy, r, 3.93) for r in (0.39, 0.06)]
+    if side < 0:
+        face = [list(reversed(r)) for r in face]
+    add_lofted_sections(bm, face, False, False, 1, open_ring=True)
+    holder = []
+    for r, dz in ((0.20, -0.02), (0.24, -0.02), (0.24, 0.02), (0.20, 0.02)):
+        holder.append(_half_arc(side, cx, cy, r, 4.12 + dz))
+    if side < 0:
+        holder = [list(reversed(r)) for r in holder]
+    add_lofted_sections(bm, holder, False, False, 0, True, open_ring=True)
+    return finalize_mesh_obj(node_name, bm, (side * 0.2, cy, 4.35), [mats["nozzle_ceramic"], mats["cockpit_dark"]], 0.0, True)
+
+
+def build_tip_light(side: int, node_name: str, mats: dict) -> bpy.types.Object:
+    """Flush navigation-light lens on the cropped wingtip (red port / green starboard)."""
+    bm = bmesh.new()
+    s = float(side)
+    yc, z_le, z_te, _ = wing_planform(3.85)
+    zc = z_le + 0.15
+    add_revolve(bm, (s * 3.87, yc, zc), (0.0, 0.0, 1.0),
+                [(0.0, 0.0), (0.016, 0.03), (0.026, 0.10), (0.026, 0.26), (0.016, 0.36), (0.0, 0.40)],
+                seg=14, closed_profile=False, mat_index=0)
+    return finalize_mesh_obj(node_name, bm, (s * 3.87, yc, zc + 0.2),
+                             mats["nav_red"] if side < 0 else mats["nav_green"], 0.0, True)
+
+
+def build_upper_spine(mats: dict) -> bpy.types.Object:
+    bm = bmesh.new()
+    z_list = [-2.40 + 5.30 * (i / 24.0) for i in range(25)]
+    add_lofted_sections(bm, [build_dorsal_arch_ring(z) for z in z_list])
+    return finalize_mesh_obj("AX9__CORE__CENTER__UPPER_SPINE", bm, (0.0, 0.62, 0.3), mats["skin_trim"], 0.0, True)
+
+
+def build_canopy_glass(mats: dict) -> bpy.types.Object:
+    bm = bmesh.new()
+    z_list = [-4.42 + 2.02 * (i / 22.0) for i in range(23)]
+    add_lofted_sections(bm, [build_dorsal_arch_ring(z) for z in z_list])
+    return finalize_mesh_obj("AX9__CANOPY__CENTER__CANOPY_GLASS", bm, (0.0, 0.62, -3.4), mats["canopy_glass"], 0.0, True)
+
+
+def build_canopy_frame(mats: dict) -> bpy.types.Object:
+    """Canopy sill rails + the single aft bow where the bubble meets the dorsal fairing."""
+    bm = bmesh.new()
+    z_list = [-4.42 + 2.02 * (i / 18.0) for i in range(19)]
+    for side in (-1.0, 1.0):
+        st = []
+        for z in z_list:
+            w, _ = dorsal_canopy_spine_profile(z)
+            w = max(0.03, w)
+            y_in = fuselage_upper_y_at_x(max(0.0, w - 0.015), z)
+            y_out = fuselage_upper_y_at_x(w + 0.02, z)
+            st.append([
+                (side * (w - 0.015), y_in + 0.02, z),
+                (side * (w + 0.02), y_out + 0.01, z),
+                (side * (w + 0.02), y_out - 0.012, z),
+                (side * (w - 0.015), y_in - 0.012, z),
+            ])
+        if side < 0:
+            st = [list(reversed(s_)) for s_ in st]
+        add_lofted_sections(bm, st)
+    # aft canopy bow
+    a = build_dorsal_arch_ring(-2.42, 0.012, 0.012)
+    b = build_dorsal_arch_ring(-2.36, 0.012, 0.012)
+    add_lofted_sections(bm, [a, b])
+    return finalize_mesh_obj("AX9__CANOPY__CENTER__CANOPY_FRAME", bm, (0.0, 0.42, -3.4), mats["carbon_stealth"], 0.0, True)
+
+
+def build_belly_shell(mats: dict) -> bpy.types.Object:
+    """Ventral centre-line fairing on the flat belly between the main gear bays."""
+    bm = bmesh.new()
+    stations = []
+    for i in range(19):
+        z = -2.0 + 4.0 * i / 18.0
+        hwb = 0.38 + 0.08 * math.sin(math.pi * i / 18.0)
+        top, bot = [], []
+        for k in range(-3, 4):
+            x = hwb * k / 3.0
+            y = fuselage_lower_y_at_x(abs(x), z)
+            top.append((x, y + 0.012, z))
+            bot.append((x, y - 0.016 * (1.0 - abs(k) / 3.0) - 0.004, z))
+        stations.append(top + list(reversed(bot)))
+    add_lofted_sections(bm, stations)
+    return finalize_mesh_obj("AX9__CORE__CENTER__BELLY_SHELL", bm, (0.0, -0.40, 0.0), mats["carbon_stealth"], 0.0, True)
+
+
+def add_long_seam(bm, z0: float, z1: float, u: float, side: float, idx: int, steps: int = 10) -> None:
+    """Raised longitudinal panel seam on the flat top at lateral fraction u of the half-width."""
+    stations = []
+    for k in range(steps + 1):
+        z = z0 + (z1 - z0) * k / steps
+        hw = fuselage_envelope(z)[0]
+        pts = []
+        for du, dy in ((-0.007, 0.004), (0.007, 0.004), (0.007, -0.004), (-0.007, -0.004)):
+            x = (u + du) * hw
+            pts.append((side * x, fuselage_upper_y_at_x(x, z) + dy, z))
+        if side < 0:
+            pts = list(reversed(pts))
+        stations.append(pts)
+    add_lofted_sections(bm, stations, True, True, idx)
+
+
+def build_conformal_service_panel(side: int, idx: int, node_name: str, z_start: float, z_end: float, mats: dict) -> bpy.types.Object:
+    """Flush access panel on the flat upper deck between the spine and the chine shoulder."""
+    bm = bmesh.new()
+    s = float(side)
+    stations = []
+    for k in range(6):
+        z = z_start + (z_end - z_start) * (k / 5.0)
+        hw = fuselage_envelope(z)[0]
+        xs = [hw * f for f in (0.42, 0.56, 0.70)]
+        top = [(s * x, fuselage_upper_y_at_x(x, z) + 0.0015, z) for x in xs]
+        bot = [(s * x, fuselage_upper_y_at_x(x, z) - 0.012, z) for x in reversed(xs)]
+        st = top + bot
+        if side < 0:
+            st = list(reversed(st))
+        stations.append(st)
+    add_lofted_sections(bm, stations)
     pz = (z_start + z_end) * 0.5
-    hw_mid, top_mid, _, chine_mid = fuselage_envelope(pz)
-    theta_mid = u_mid * math.pi * 0.5
-    px = s * hw_mid * math.sin(theta_mid)
-    py = chine_mid + (top_mid - chine_mid) * (math.cos(theta_mid) ** 0.90)
+    px = fuselage_envelope(pz)[0] * 0.56
     mat = mats["skin_trim"] if idx % 2 == 1 else mats["skin_primary"]
-    return finalize_mesh_obj(node_name, bm, (px, py, pz), mat, 0.0, True)
+    return finalize_mesh_obj(node_name, bm, (s * px, fuselage_upper_y_at_x(px, pz), pz), mat, 0.0, True)
+
+
+
+def build_nose_shell(mats: dict) -> bpy.types.Object:
+    """
+    Chined stealth radome (hollow) with radome joint seams, pitot, IRST window ahead of the
+    windscreen, ventral blade antenna, and an AESA array on the forward pressure bulkhead.
+    Slots: 0 skin, 1 dark interior, 2 trim seams, 3 alloy, 4 radar tiles.
+    """
+    bm = bmesh.new()
+    SKIN, DARK, TRIM, ALLOY, TILE = 0, 1, 2, 3, 4
+    z_list = [-6.50 + (NOSE_END_Z + 6.50) * (i / 21.0) for i in range(22)]
+    add_hollow_shell(bm, z_list[1:], 0.95, SKIN, DARK)
+    add_lofted_sections(bm, [chine_ring(z_list[0]), chine_ring(z_list[1])], True, False, SKIN)
+    for zs in (-5.75, -5.15):
+        add_seam_band(bm, zs, TRIM)
+    for side in (-1.0, 1.0):
+        add_long_seam(bm, -5.6, -4.6, 0.5, side, TRIM, 6)
+    add_tube(bm, (0.0, -0.03, -6.48), (0.0, -0.03, -6.92), 0.013, 0.008, seg=10, mat_index=ALLOY)
+    add_tube(bm, (0.0, -0.03, -6.92), (0.0, -0.03, -7.04), 0.006, 0.004, seg=8, mat_index=ALLOY)
+    # Faceted EOTS/IRST window under the nose (sapphire facets)
+    zc = -5.0
+    yb = fuselage_lower_y_at_x(0.0, zc)
+    add_revolve(bm, (0.0, yb + 0.01, zc), (0.0, -1.0, 0.0),
+                [(0.0, 0.0), (0.09, 0.0), (0.08, 0.04), (0.05, 0.065), (0.0, 0.07)], seg=8, closed_profile=False, mat_index=TILE)
+    _, top_y, _, _ = fuselage_envelope(-4.75)
+    add_blade_antenna(bm, (0.0, top_y - 0.005, -4.95), 0.10, TRIM)
+    add_ring_frame(bm, -4.60, 0.05, 0.95, 0.30, DARK)
+    add_revolve(bm, (0.0, 0.0, -4.66), (0.0, 0.0, -1.0),
+                [(0.0, 0.0), (0.25, 0.0), (0.265, 0.025), (0.25, 0.05), (0.0, 0.05)], seg=32, closed_profile=False, mat_index=ALLOY)
+    for gx in range(-2, 3):
+        for gy in range(-2, 3):
+            cx, cy = gx * 0.088, gy * 0.08
+            if cx * cx + cy * cy > 0.21 ** 2:
+                continue
+            add_box_strip(bm, cx - 0.037, cx + 0.037, cy - 0.034, cy + 0.034, -4.722, -4.71, TILE)
+    add_tube(bm, (0.0, 0.0, -4.58), (0.0, 0.0, -4.66), 0.045, seg=16, mat_index=ALLOY)
+    return finalize_mesh_obj(
+        "AX9__CORE__CENTER__NOSE_SHELL", bm, (0.0, 0.0, -5.4),
+        [mats["skin_primary"], mats["cockpit_dark"], mats["skin_trim"], mats["alloy_mech"], mats["emitter_cyan"]],
+        0.0, True,
+    )
+
+
+def build_main_fuselage(mats: dict) -> bpy.types.Object:
+    """
+    Hollow blended centre body: skin with seams/antennas, ring frames, longerons, avionics racks
+    with status LEDs, wiring looms and a conformal fuel cell.
+    Slots: 0 skin, 1 dark liner, 2 trim seams, 3 alloy, 4 LEDs, 5 fuel cell.
+    """
+    bm = bmesh.new()
+    SKIN, DARK, TRIM, ALLOY, LED, TANK = 0, 1, 2, 3, 4, 5
+    z_list = [NOSE_END_Z + (MAIN_END_Z - NOSE_END_Z) * (i / 30.0) for i in range(31)]
+    add_hollow_shell(bm, z_list, 0.955, SKIN, DARK)
+    for zs in (-4.48, -2.2, -1.0, 0.1, 1.2):
+        add_seam_band(bm, zs, TRIM)
+    for side in (-1.0, 1.0):
+        add_long_seam(bm, -2.2, 2.1, 0.30, side, TRIM, 14)
+        add_long_seam(bm, -0.9, 2.1, 0.86, side, TRIM, 10)
+    add_blade_antenna(bm, (0.0, fuselage_lower_y_at_x(0.0, -0.9) + 0.005, -0.9), -0.15, TRIM)
+    add_blade_antenna(bm, (0.0, fuselage_lower_y_at_x(0.0, 1.4) + 0.005, 1.4), -0.11, TRIM)
+    for z_rib in (-4.2, -3.4, -2.6, -1.8, -1.0, -0.2, 0.6, 1.4, 2.05):
+        add_ring_frame(bm, z_rib, 0.045, 0.95, 0.80, ALLOY)
+    ring_a = chine_ring(NOSE_END_Z + 0.05, 0.90)
+    ring_b = chine_ring(MAIN_END_Z - 0.05, 0.90)
+    for k in (0, 6, 12, 18, 24, 30, 36, 42):
+        add_tube(bm, ring_a[k], ring_b[k], 0.012, seg=6, mat_index=ALLOY)
+    for sx in (-1.0, 1.0):
+        for y0, y1 in ((0.02, 0.12), (0.14, 0.24)):
+            add_chamfer_prism(bm, (sx * 0.22, (y0 + y1) / 2, -2.20), (sx * 0.22, (y0 + y1) / 2, -1.60),
+                              0.14, (y1 - y0) / 2, 0.008, DARK)
+            add_box_strip(bm, sx * 0.09, sx * 0.33, y1 - 0.02, y1 - 0.014, -2.205, -2.195, LED)
+        add_tube(bm, (sx * 0.22, 0.25, -1.58), (sx * 0.14, 0.27, 1.6), 0.018, seg=8, mat_index=DARK)
+        add_tube(bm, (sx * 0.28, 0.22, -1.58), (sx * 0.34, 0.20, 1.6), 0.012, seg=8, mat_index=TRIM)
+    tank = []
+    for i in range(9):
+        z = -1.2 + 3.1 * i / 8.0
+        sw = math.sin(math.pi * i / 8.0) ** 0.35
+        a, b = 0.42 * sw + 0.02, 0.11 * sw + 0.01
+        ring = []
+        for k in range(20):
+            t = k * 2.0 * math.pi / 20
+            c, s_ = math.cos(t), math.sin(t)
+            ring.append((a * math.copysign(abs(c) ** 0.6, c), 0.20 + b * math.copysign(abs(s_) ** 0.6, s_), z))
+        tank.append(ring)
+    add_lofted_sections(bm, tank, True, True, TANK)
+    return finalize_mesh_obj(
+        "AX9__CORE__CENTER__MAIN_FUSELAGE", bm, (0.0, 0.02, -1.2),
+        [mats["skin_primary"], mats["cockpit_dark"], mats["skin_trim"], mats["alloy_mech"],
+         mats["emitter_cyan"], mats["carbon_stealth"]],
+        0.0, True,
+    )
+
+
+def build_rear_fuselage(mats: dict) -> bpy.types.Object:
+    """Hollow aft body tapering onto the single nozzle, with seams and frames."""
+    bm = bmesh.new()
+    SKIN, DARK, TRIM, ALLOY = 0, 1, 2, 3
+    z_list = [MAIN_END_Z - 0.02 + (TAIL_END_Z - MAIN_END_Z + 0.02) * (i / 16.0) for i in range(17)]
+    add_hollow_shell(bm, z_list, 0.94, SKIN, DARK)
+    for zs in (2.8, 3.5):
+        add_seam_band(bm, zs, TRIM)
+    for z_rib in (2.4, 3.1, 3.8):
+        add_ring_frame(bm, z_rib, 0.04, 0.94, 0.80, ALLOY)
+    return finalize_mesh_obj(
+        "AX9__CORE__CENTER__REAR_FUSELAGE", bm, (0.0, 0.02, 3.1),
+        [mats["skin_primary"], mats["cockpit_dark"], mats["skin_trim"], mats["alloy_mech"]],
+        0.0, True,
+    )
 
 
 def generate_aircraft() -> None:
@@ -1334,9 +1283,9 @@ def generate_aircraft() -> None:
 
     # 4. THREE ARTICULATED LANDING GEAR ASSEMBLIES (12 parts)
     gear_specs = [
-        ("FRONT", (0.0, -0.32, -3.35), (0.0, -0.90, -3.35), (-0.18, 0.02, -0.31, -3.90, -2.85), 0.21, 0.070),
-        ("LEFT", (-1.02, -0.32, 0.65), (-1.02, -0.90, 0.65), (-1.22, -0.76, -0.32, 0.05, 1.25), 0.27, 0.090),
-        ("RIGHT", (1.02, -0.32, 0.65), (1.02, -0.90, 0.65), (0.76, 1.22, -0.32, 0.05, 1.25), 0.27, 0.090),
+        ("FRONT", (0.0, -0.40, -4.30), (0.0, -0.96, -4.30), (-0.15, 0.05, -0.40, -4.85, -3.80), 0.21, 0.070),
+        ("LEFT", (-0.80, -0.51, 0.85), (-0.80, -0.90, 0.85), (-1.00, -0.58, -0.52, 0.20, 1.45), 0.27, 0.090),
+        ("RIGHT", (0.80, -0.51, 0.85), (0.80, -0.90, 0.85), (0.58, 1.00, -0.52, 0.20, 1.45), 0.27, 0.090),
     ]
 
     for g_side, strut_piv, wheel_piv, door_box, w_rad, w_hw in gear_specs:
@@ -1383,7 +1332,7 @@ def generate_aircraft() -> None:
     glb_size = os.path.getsize(OUTPUT_GLB_PATH)
     report = {
         "status": "PASS",
-        "generator": "Blender 4.5 Headless Precision CAD & Conformal Stealth Generator (v6 Hollow Airframe, Internal Structure & Fixed Gear Parenting)",
+        "generator": "Blender 4.5 Headless Precision CAD & Conformal Stealth Generator (v8 Stealth Fighter OML)",
         "outputGlb": "public/assets/aircraft/aeris-x9.glb",
         "fileSizeBytes": glb_size,
         "expectedContractNodes": len(expected_nodes),
@@ -1400,7 +1349,7 @@ def generate_aircraft() -> None:
         json.dump(report, rf, indent=2)
 
     print(
-        f"[AERIS X-9 v6] Exported {len(created_objects)}/46 nodes, "
+        f"[AERIS X-9 v8] Exported {len(created_objects)}/46 nodes, "
         f"{total_tris} triangles, {glb_size} bytes -> {OUTPUT_GLB_PATH}"
     )
 

@@ -82,7 +82,7 @@ export const AircraftSystemsVfx: React.FC = () => {
         <group
           key={`turbofan-${side}`}
           ref={side < 0 ? fanLeftRef : fanRightRef}
-          position={[side * 0.56, 1.32, -1.45]}
+          position={[side * 0.95, 1.31, -2.6]}
         >
           {/* Spinner Cone */}
           <mesh rotation={[Math.PI / 2, 0, 0]}>
@@ -112,7 +112,7 @@ export const AircraftSystemsVfx: React.FC = () => {
       ))}
 
       {/* 2. Anti-Collision Red Beacons (Top Spine & Belly - 1 Hz Flash) */}
-      <mesh position={[0, 2.18, 0.72]}>
+      <mesh position={[0, 2.08, 1.0]}>
         <sphereGeometry args={[0.042, 16, 16]} />
         <meshBasicMaterial
           ref={dorsalBeaconMatRef}
@@ -121,7 +121,7 @@ export const AircraftSystemsVfx: React.FC = () => {
           opacity={0.9}
         />
       </mesh>
-      <mesh position={[0, 1.04, 0.18]}>
+      <mesh position={[0, 0.83, 0.3]}>
         <sphereGeometry args={[0.038, 16, 16]} />
         <meshBasicMaterial
           ref={ventralBeaconMatRef}
@@ -132,7 +132,7 @@ export const AircraftSystemsVfx: React.FC = () => {
       </mesh>
 
       {/* 3. Wingtip Navigation (Red Port / Green Starboard) & White Double-Strobe Lights */}
-      <mesh position={[-4.91, 1.91, 2.12]}>
+      <mesh position={[-3.9, 1.48, 1.55]}>
         <sphereGeometry args={[0.048, 16, 16]} />
         <meshBasicMaterial
           ref={strobeLeftMatRef}
@@ -141,7 +141,7 @@ export const AircraftSystemsVfx: React.FC = () => {
           opacity={0.9}
         />
       </mesh>
-      <mesh position={[4.91, 1.91, 2.12]}>
+      <mesh position={[3.9, 1.48, 1.55]}>
         <sphereGeometry args={[0.048, 16, 16]} />
         <meshBasicMaterial
           ref={strobeRightMatRef}
@@ -152,7 +152,7 @@ export const AircraftSystemsVfx: React.FC = () => {
       </mesh>
 
       {/* 4. Volumetric Nose-Gear Taxi & Landing Light Cone Washing the Centerline */}
-      <group ref={landingConeGroupRef} position={[0, 0.68, -3.38]}>
+      <group ref={landingConeGroupRef} position={[0, 0.68, -4.45]}>
         {/* Bright Headlamp Lens on Nose Strut */}
         <mesh position={[0, 0, -0.06]}>
           <sphereGeometry args={[0.045, 16, 16]} />
