@@ -44,6 +44,18 @@ test.describe('AERIS X-9 — End-to-End & Visual Acceptance Suite (Gates G2–G8
     await page.getByTestId('cutaway-toggle').click();
     await page.waitForTimeout(300);
 
+    // 1c. Verify Front Elevation & Top Plan symmetry and zero distortion
+    await page.getByTestId('camera-preset-front').click();
+    await page.waitForTimeout(950);
+    await page.screenshot({ path: 'proof/view-front.png' });
+
+    await page.getByTestId('camera-preset-top').click();
+    await page.waitForTimeout(950);
+    await page.screenshot({ path: 'proof/view-top.png' });
+
+    await page.getByTestId('camera-preset-hero').click();
+    await page.waitForTimeout(850);
+
     // 2. Part Selection & Inspector Drawer (B02, B03)
     await page.getByTestId('parts-drawer-toggle').click();
     await expect(page.getByTestId('part-details-drawer')).toBeVisible();

@@ -110,6 +110,7 @@ export const FlightDirector: React.FC = () => {
 
       const shouldAutoSpin =
         state.mode === 'showroom' &&
+        state.cameraPreset === 'hero' &&
         !state.reducedMotion &&
         !state.isUserOrbiting &&
         state.selectedPartId === null &&
@@ -120,6 +121,8 @@ export const FlightDirector: React.FC = () => {
           (visualClockRef.turntableAngleRad +
             TURNTABLE_DEG_PER_SEC * DEG2RAD * dt) %
           (Math.PI * 2);
+      } else if (state.cameraPreset !== 'hero') {
+        visualClockRef.turntableAngleRad = 0;
       }
     }
 

@@ -572,6 +572,7 @@ export const useAppStore = create<AppState>((set, get) => ({
       }
 
       case 'SET_CAMERA_PRESET': {
+        visualClockRef.turntableAngleRad = 0;
         set({
           cameraPreset: event.preset,
           cameraResetNonce: state.cameraResetNonce + 1,
@@ -580,6 +581,7 @@ export const useAppStore = create<AppState>((set, get) => ({
       }
 
       case 'RESET_VIEW': {
+        visualClockRef.turntableAngleRad = 0;
         set({
           cameraPreset: 'hero',
           cameraResetNonce: state.cameraResetNonce + 1,

@@ -133,15 +133,18 @@ export const CameraRig: React.FC = () => {
     }
 
     if (isTransitionActiveRef.current) {
-      const factor = state.reducedMotion ? 1.0 : Math.min(1, dt * 4.5);
+      const factor = state.reducedMotion ? 1.0 : Math.min(1, dt * 12.0);
       camera.position.lerp(desiredPosRef.current, factor);
       controls.target.lerp(desiredTargetRef.current, factor);
       controls.update();
 
       if (
-        camera.position.distanceTo(desiredPosRef.current) < 0.03 &&
-        controls.target.distanceTo(desiredTargetRef.current) < 0.02
+        camera.position.distanceTo(desiredPosRef.current) < 0.06 &&
+        controls.target.distanceTo(desiredTargetRef.current) < 0.04
       ) {
+        camera.position.copy(desiredPosRef.current);
+        controls.target.copy(desiredTargetRef.current);
+        controls.update();
         isTransitionActiveRef.current = false;
       }
     }
@@ -159,9 +162,9 @@ export const CameraRig: React.FC = () => {
       dampingFactor={0.07}
       enablePan={false}
       minDistance={4.2}
-      maxDistance={21.0}
-      minPolarAngle={0.14}
-      maxPolarAngle={Math.PI * 0.485}
+      maxDistance={26.0}
+      minPolarAngle={0.002}
+      maxPolarAngle={Math.PI * 0.49}
       onStart={() => {
         isTransitionActiveRef.current = false;
         setIsUserOrbiting(true);
