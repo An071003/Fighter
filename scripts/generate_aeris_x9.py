@@ -576,28 +576,200 @@ def build_wing_slice_ring(
 # BUILDERS FOR ALL 46 CONTRACTUAL NODES
 # ==============================================================================
 
+def _scaled_ring(z: float, s: float) -> list[tuple[float, float, float]]:
+    return chine_ring(z, s)
+
+
+def add_hollow_shell(
+    bm: bmesh.types.BMesh,
+    z_list: list[float],
+    wall_scale: float,
+    out_idx: int,
+    in_idx: int,
+    close_start: bool = False,
+    close_end: bool = False,
+) -> None:
+    """Outer skin + inner liner (scaled chine rings) joined by rim faces at open ends."""
+    outer = add_lofted_sections(bm, [chine_ring(z) for z in z_list], close_start, close_end, out_idx)
+    inner = add_lofted_sections(bm, [_scaled_ring(z, wall_scale) for z in z_list], False, False, in_idx)
+    n = len(outer[0])
+    for end, is_open in ((0, not close_start), (-1, not close_end)):
+        if not is_open:
+            continue
+        for j in range(n):
+            jn = (j + 1) % n
+            bm.faces.new((outer[end][j], outer[end][jn], inner[end][jn], inner[end][j])).material_index = out_idx
+
+
+def add_ring_frame(bm, z: float, depth: float, s_out: float, s_in: float, idx: int) -> None:
+    """Annular bulkhead frame (ring with a lightening hole) conforming to the chine section."""
+    z0, z1 = z - depth * 0.5, z + depth * 0.5
+    o = add_lofted_sections(bm, [chine_ring(z0, s_out), chine_ring(z1, s_out)], False, False, idx)
+    i = add_lofted_sections(bm, [chine_ring(z0, s_in), chine_ring(z1, s_in)], False, False, idx)
+    n = len(o[0])
+    for end in (0, 1):
+        for j in range(n):
+            jn = (j + 1) % n
+            bm.faces.new((o[end][j], o[end][jn], i[end][jn], i[end][j])).material_index = idx
+
+
+def add_seam_band(bm, z: float, idx: int, width: float = 0.014, lift: float = 1.006) -> None:
+    """Raised circumferential panel seam (renders as a crisp double CAD line)."""
+    add_lofted_sections(bm, [chine_ring(z - width * 0.5, lift), chine_ring(z + width * 0.5, lift)], False, False, idx)
+
+
+def add_long_seam(bm, z0: float, z1: float, u: float, side: float, idx: int, steps: int = 10) -> None:
+    """Raised longitudinal seam strip on the upper chine surface at angular fraction u."""
+    stations = []
+    for k in range(steps + 1):
+        z = z0 + (z1 - z0) * k / steps
+        hw, top_y, _, chine_y = fuselage_envelope(z)
+        pts = []
+        for du, dy in ((-0.006, 0.004), (0.006, 0.004), (0.006, -0.004), (-0.006, -0.004)):
+            th = (u + du) * math.pi * 0.5
+            x = side * hw * math.sin(th)
+            y = chine_y + (top_y - chine_y) * (max(0.0, math.cos(th)) ** 0.90)
+            pts.append((x, y + dy, z))
+        if side < 0:
+            pts = list(reversed(pts))
+        stations.append(pts)
+    add_lofted_sections(bm, stations, True, True, idx)
+
+
+def add_blade_antenna(bm, base: tuple[float, float, float], up: float, idx: int) -> None:
+    """Swept blade antenna (thin tapered fin)."""
+    bx, by, bz = base
+    add_chamfer_prism(bm, (bx, by, bz - 0.09), (bx, by, bz + 0.06), 0.006, 0.004, 0.002, idx)
+    stations = [
+        [(bx - 0.006, by, bz - 0.08), (bx + 0.006, by, bz - 0.08), (bx + 0.006, by, bz + 0.06), (bx - 0.006, by, bz + 0.06)],
+        [(bx - 0.003, by + up, bz + 0.02), (bx + 0.003, by + up, bz + 0.02), (bx + 0.003, by + up, bz + 0.08), (bx - 0.003, by + up, bz + 0.08)],
+    ]
+    add_lofted_sections(bm, stations, True, True, idx)
+
+
 def build_nose_shell(mats: dict) -> bpy.types.Object:
+    """
+    Hollow radome + forward avionics nose: radome joint seam, panel seams, pitot probe,
+    IRST sensor ball, AESA radar array (tiled face on a gimbal) on the rear pressure bulkhead.
+    Slots: 0 skin, 1 dark interior, 2 trim seams, 3 alloy, 4 radar tiles.
+    """
     bm = bmesh.new()
+    SKIN, DARK, TRIM, ALLOY, TILE = 0, 1, 2, 3, 4
     z_list = [-6.50 + 3.20 * (i / 21.0) for i in range(22)]
-    stations = [chine_ring(z) for z in z_list]
-    add_lofted_sections(bm, stations)
-    # Conformal internal AESA radar bulkhead tucked strictly inside at scale_inset=0.68
-    radar_st = [chine_ring(-3.42, 0.68), chine_ring(-3.32, 0.68)]
-    add_lofted_sections(bm, radar_st)
-    return finalize_mesh_obj("AX9__CORE__CENTER__NOSE_SHELL", bm, (0.0, 0.04, -4.90), mats["skin_primary"], 0.0, True)
+    add_hollow_shell(bm, z_list[1:], 0.95, SKIN, DARK, close_start=False, close_end=False)
+    # Solid tip cap so the radome reads closed
+    add_lofted_sections(bm, [chine_ring(z_list[0]), chine_ring(z_list[1])], True, False, SKIN)
+    # Seams: radome joint + two avionics bay seams
+    for zs in (-5.05, -4.25, -3.62):
+        add_seam_band(bm, zs, TRIM)
+    for side in (-1.0, 1.0):
+        add_long_seam(bm, -5.0, -3.35, 0.55, side, TRIM, 6)
+    # Pitot probe
+    add_tube(bm, (0.0, -0.05, -6.48), (0.0, -0.05, -6.95), 0.014, 0.008, seg=10, mat_index=ALLOY)
+    add_tube(bm, (0.0, -0.05, -6.95), (0.0, -0.05, -7.08), 0.006, 0.004, seg=8, mat_index=ALLOY)
+    # IRST sensor ball ahead of the windscreen (offset right)
+    _, top_y, _, _ = fuselage_envelope(-3.75)
+    add_revolve(bm, (0.16, top_y - 0.01, -3.75), (0.0, 1.0, 0.0),
+                [(0.0, 0.0), (0.05, 0.0), (0.065, 0.03), (0.055, 0.075), (0.03, 0.095), (0.0, 0.10)],
+                seg=18, closed_profile=False, mat_index=DARK)
+    # Ventral blade antenna
+    _, _, bot_y, _ = fuselage_envelope(-4.2)
+    add_blade_antenna(bm, (0.0, bot_y + 0.005, -4.2), -0.14, TRIM)
+    # Rear pressure bulkhead + AESA array on gimbal yoke
+    add_ring_frame(bm, -3.42, 0.06, 0.95, 0.30, DARK)
+    add_revolve(bm, (0.0, 0.05, -3.55), (0.0, 0.0, -1.0),
+                [(0.0, 0.0), (0.40, 0.0), (0.42, 0.03), (0.40, 0.06), (0.0, 0.06)],
+                seg=32, closed_profile=False, mat_index=ALLOY)
+    for gx in range(-3, 4):
+        for gy in range(-3, 4):
+            cx, cy = gx * 0.095, gy * 0.085
+            if cx * cx + cy * cy > 0.33 ** 2:
+                continue
+            add_box_strip(bm, cx - 0.04, cx + 0.04, 0.05 + cy - 0.036, 0.05 + cy + 0.036, -3.625, -3.612, TILE)
+    add_tube(bm, (0.0, 0.05, -3.45), (0.0, 0.05, -3.55), 0.06, seg=16, mat_index=ALLOY)
+    for sx in (-1.0, 1.0):
+        add_chamfer_prism(bm, (sx * 0.43, 0.05, -3.45), (sx * 0.43, 0.05, -3.60), 0.02, 0.06, 0.01, ALLOY)
+    return finalize_mesh_obj(
+        "AX9__CORE__CENTER__NOSE_SHELL", bm, (0.0, 0.04, -4.90),
+        [mats["skin_primary"], mats["cockpit_dark"], mats["skin_trim"], mats["alloy_mech"], mats["emitter_cyan"]],
+        0.0, True,
+    )
 
 
 def build_main_fuselage(mats: dict) -> bpy.types.Object:
+    """
+    Hollow centre fuselage: thick skin with seams & antennas, ring frames, longerons,
+    avionics racks with status LEDs, wiring looms and a conformal fuel cell.
+    Slots: 0 skin, 1 dark interior liner, 2 trim seams, 3 alloy structure, 4 LEDs, 5 fuel cell.
+    """
     bm = bmesh.new()
+    SKIN, DARK, TRIM, ALLOY, LED, TANK = 0, 1, 2, 3, 4, 5
     z_list = [-3.30 + 5.50 * (i / 25.0) for i in range(26)]
-    stations = [chine_ring(z) for z in z_list]
-    add_lofted_sections(bm, stations)
+    add_hollow_shell(bm, z_list, 0.955, SKIN, DARK)
 
-    # Conformal internal structural bulkhead rings (scale_inset=0.72) so NOTHING ever pokes through the skin!
-    for z_rib in (-1.50, -0.75, 0.0, 0.75, 1.50):
-        rib_st = [chine_ring(z_rib - 0.03, 0.72), chine_ring(z_rib + 0.03, 0.72)]
-        add_lofted_sections(bm, rib_st)
-    return finalize_mesh_obj("AX9__CORE__CENTER__MAIN_FUSELAGE", bm, (0.0, 0.05, -0.55), mats["skin_primary"], 0.0, True)
+    # Exterior seams, longitudinal panel lines, blade antennas, NACA-style vent
+    for zs in (-2.55, -1.05, -0.05, 0.95, 1.85):
+        add_seam_band(bm, zs, TRIM)
+    for side in (-1.0, 1.0):
+        add_long_seam(bm, -3.2, 2.1, 0.78, side, TRIM, 14)
+    _, _, bot_y, _ = fuselage_envelope(-0.6)
+    add_blade_antenna(bm, (0.0, bot_y + 0.005, -0.6), -0.16, TRIM)
+    add_blade_antenna(bm, (0.0, bot_y + 0.005, 1.2), -0.12, TRIM)
+
+    # Structure: ring frames + longerons
+    for z_rib in (-2.95, -2.2, -1.5, -0.75, 0.0, 0.75, 1.5, 2.05):
+        add_ring_frame(bm, z_rib, 0.045, 0.95, 0.80, ALLOY)
+    ring_a = chine_ring(-3.25, 0.90)
+    ring_b = chine_ring(2.15, 0.90)
+    for k in (0, 6, 12, 18, 24, 30, 36, 42):
+        add_tube(bm, ring_a[k], ring_b[k], 0.012, seg=6, mat_index=ALLOY)
+
+    # Avionics racks behind the seat (two stacks) with LED strips + looms
+    for sx in (-1.0, 1.0):
+        for k, (y0, y1) in enumerate(((0.02, 0.12), (0.14, 0.24))):
+            add_chamfer_prism(bm, (sx * 0.20, (y0 + y1) / 2, -1.42), (sx * 0.20, (y0 + y1) / 2, -0.88),
+                              0.13, (y1 - y0) / 2, 0.008, DARK)
+            add_box_strip(bm, sx * 0.08, sx * 0.30, y1 - 0.02, y1 - 0.014, -1.425, -1.415, LED)
+        add_tube(bm, (sx * 0.20, 0.25, -0.86), (sx * 0.12, 0.27, 1.6), 0.018, seg=8, mat_index=DARK)
+        add_tube(bm, (sx * 0.24, 0.22, -0.86), (sx * 0.30, 0.20, 1.6), 0.012, seg=8, mat_index=TRIM)
+
+    # Conformal fuel cell (superelliptic lofted bladder)
+    tank = []
+    for i in range(9):
+        z = -0.55 + 2.45 * i / 8.0
+        sw = math.sin(math.pi * i / 8.0) ** 0.35
+        a, b = 0.34 * sw + 0.02, 0.10 * sw + 0.01
+        ring = []
+        for k in range(20):
+            t = k * 2.0 * math.pi / 20
+            c, s_ = math.cos(t), math.sin(t)
+            ring.append((a * math.copysign(abs(c) ** 0.6, c), 0.17 + b * math.copysign(abs(s_) ** 0.6, s_), z))
+        tank.append(ring)
+    add_lofted_sections(bm, tank, True, True, TANK)
+
+    return finalize_mesh_obj(
+        "AX9__CORE__CENTER__MAIN_FUSELAGE", bm, (0.0, 0.05, -0.55),
+        [mats["skin_primary"], mats["cockpit_dark"], mats["skin_trim"], mats["alloy_mech"],
+         mats["emitter_cyan"], mats["carbon_stealth"]],
+        0.0, True,
+    )
+
+
+def build_rear_fuselage(mats: dict) -> bpy.types.Object:
+    """Hollow aft fuselage with seams, frames and the engine bay firewall."""
+    bm = bmesh.new()
+    SKIN, DARK, TRIM, ALLOY = 0, 1, 2, 3
+    z_list = [2.18 + 2.57 * (i / 16.0) for i in range(17)]
+    add_hollow_shell(bm, z_list, 0.955, SKIN, DARK, close_end=True)
+    for zs in (2.7, 3.4, 4.1):
+        add_seam_band(bm, zs, TRIM)
+    for z_rib in (2.35, 3.0, 3.7):
+        add_ring_frame(bm, z_rib, 0.04, 0.95, 0.78, ALLOY)
+    return finalize_mesh_obj(
+        "AX9__CORE__CENTER__REAR_FUSELAGE", bm, (0.0, 0.05, 3.40),
+        [mats["skin_primary"], mats["cockpit_dark"], mats["skin_trim"], mats["alloy_mech"]],
+        0.0, True,
+    )
 
 
 def build_upper_spine(mats: dict) -> bpy.types.Object:
@@ -630,14 +802,6 @@ def build_belly_shell(mats: dict) -> bpy.types.Object:
         stations.append(top_pts + list(reversed(bot_pts)))
     add_lofted_sections(bm, stations)
     return finalize_mesh_obj("AX9__CORE__CENTER__BELLY_SHELL", bm, (0.0, -0.32, 0.10), mats["carbon_stealth"], 0.0, True)
-
-
-def build_rear_fuselage(mats: dict) -> bpy.types.Object:
-    bm = bmesh.new()
-    z_list = [2.18 + 2.57 * (i / 16.0) for i in range(17)]
-    stations = [chine_ring(z) for z in z_list]
-    add_lofted_sections(bm, stations)
-    return finalize_mesh_obj("AX9__CORE__CENTER__REAR_FUSELAGE", bm, (0.0, 0.05, 3.40), mats["skin_primary"], 0.0, True)
 
 
 def build_canopy_glass(mats: dict) -> bpy.types.Object:
@@ -913,6 +1077,7 @@ def build_gear_assembly(g_side, strut_piv, wheel_piv, door_box, w_rad, w_hw, mat
     obj_hub = finalize_mesh_obj(h_name, bm_hub, wheel_piv, [mats["alloy_mech"], mats["chrome"]], 0.0, True)
     created_objects[h_name] = obj_hub
 
+    bpy.context.view_layer.update()  # refresh matrix_world before re-parenting
     w_world = obj_wheel.matrix_world.copy()
     obj_wheel.parent = obj_strut
     obj_wheel.matrix_parent_inverse = Matrix.Identity(4)
@@ -1218,7 +1383,7 @@ def generate_aircraft() -> None:
     glb_size = os.path.getsize(OUTPUT_GLB_PATH)
     report = {
         "status": "PASS",
-        "generator": "Blender 4.5 Headless Precision CAD & Conformal Stealth Generator (v5 Detailed Mechanics & Reference Palette)",
+        "generator": "Blender 4.5 Headless Precision CAD & Conformal Stealth Generator (v6 Hollow Airframe, Internal Structure & Fixed Gear Parenting)",
         "outputGlb": "public/assets/aircraft/aeris-x9.glb",
         "fileSizeBytes": glb_size,
         "expectedContractNodes": len(expected_nodes),
@@ -1235,7 +1400,7 @@ def generate_aircraft() -> None:
         json.dump(report, rf, indent=2)
 
     print(
-        f"[AERIS X-9 v5] Exported {len(created_objects)}/46 nodes, "
+        f"[AERIS X-9 v6] Exported {len(created_objects)}/46 nodes, "
         f"{total_tris} triangles, {glb_size} bytes -> {OUTPUT_GLB_PATH}"
     )
 

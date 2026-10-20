@@ -14,6 +14,8 @@ import { Turntable } from './scene/Turntable';
 import { StoryAnchorProjector } from './story/StoryAnchorProjector';
 import { Atmosphere } from './vfx/Atmosphere';
 import { AircraftSystemsVfx } from './vfx/AircraftSystemsVfx';
+import { AirflowStreamlines } from './vfx/AirflowStreamlines';
+import { EngineExhaust } from './vfx/EngineExhaust';
 import { MaterialHighlight } from './vfx/MaterialHighlight';
 import { WindTrails } from './vfx/WindTrails';
 
@@ -35,6 +37,8 @@ export const SceneRoot: React.FC = () => {
               <JetModel />
             </PartPicker>
             <AircraftSystemsVfx />
+            <EngineExhaust />
+            <AirflowStreamlines />
           </AircraftRig>
         </Suspense>
       </ResourceBoundary>

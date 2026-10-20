@@ -135,7 +135,7 @@ export const STORY_PHASES: readonly StoryPhase[] = [
     statusLine: 'Cất cánh · CONF 1 · N1 92% · 145 kt · càng hạ',
     camera: { position: [-8.6, 3.0, 12.6], target: [0, 1.4, 2.2], fov: 30 },
     systems: { cutaway: false, beacon: true, strobe: true, landing: true },
-    flight: { kind: 'segment', fromSeconds: 0, toSeconds: 3.0 },
+    flight: { kind: 'segment', fromSeconds: 0, toSeconds: 2.95 },
     callout: {
       index: 5,
       partId: 'exhaust-ring-left',
@@ -154,7 +154,7 @@ export const STORY_PHASES: readonly StoryPhase[] = [
     statusLine: 'Thu càng · CONF 1 · N1 92% · 178 kt · càng đang thu',
     camera: { position: [-12.2, 2.3, -5.8], target: [-0.4, 1.15, 0.4], fov: 30 },
     systems: { cutaway: true, beacon: true, strobe: true, landing: true },
-    flight: { kind: 'segment', fromSeconds: 3.0, toSeconds: 7.0 },
+    flight: { kind: 'segment', fromSeconds: 2.95, toSeconds: 7.0 },
     callout: {
       index: 6,
       partId: 'gear-strut-left',

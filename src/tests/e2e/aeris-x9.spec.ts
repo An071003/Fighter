@@ -190,6 +190,9 @@ test.describe('AERIS X-9 — End-to-End & Visual Acceptance Suite (Gates G2–G8
   test('Guided 7-phase story: hotkeys, pinned callouts, take-off hold, climb cutaway, cruise and exit', async ({
     page,
   }) => {
+    // Flight segments advance at most 0.05s of sim-time per frame; headless SwiftShader renders the
+    // v6 airframe + exhaust/airflow VFX at ~2 fps (measured), so 2.95s of take-off takes ~30s wall time.
+    test.setTimeout(300000);
     const pageErrors: string[] = [];
     page.on('pageerror', (err) => pageErrors.push(err.message));
 
@@ -221,20 +224,21 @@ test.describe('AERIS X-9 — End-to-End & Visual Acceptance Suite (Gates G2–G8
     await page.keyboard.press('l');
     await expect(page.getByTestId('story-toggle-landing')).toHaveAttribute('aria-pressed', 'false');
 
-    // Take-off plays the flight timeline and holds at 3.0s with anchor XZ locked
+    // Take-off plays the flight timeline and holds at 2.95s (no auto cutaway) with anchor XZ locked
     await page.keyboard.press('5');
     await expect(root).toHaveAttribute('data-scene-mode', 'flight-transition');
     await page.waitForFunction(
-      () => window.__AERIS_DEBUG__!.getVisualClock().flightTimeSeconds >= 2.99,
+      () => window.__AERIS_DEBUG__!.getVisualClock().flightTimeSeconds >= 2.94,
       null,
-      { timeout: 20000 }
+      { timeout: 75000 }
     );
     await page.waitForTimeout(400);
     const held = await page.evaluate(() => {
       const c = window.__AERIS_DEBUG__!.getVisualClock();
       return { t: c.flightTimeSeconds, x: c.anchorWorldX, z: c.anchorWorldZ };
     });
-    expect(held.t).toBeCloseTo(3.0, 2);
+    expect(held.t).toBeCloseTo(2.95, 2);
+    await expect(page.getByTestId('story-toggle-cutaway')).toHaveAttribute('aria-pressed', 'false');
     expect(held.x).toBe(0);
     expect(held.z).toBe(0);
 
@@ -242,7 +246,7 @@ test.describe('AERIS X-9 — End-to-End & Visual Acceptance Suite (Gates G2–G8
     await page.keyboard.press('ArrowRight');
     await expect(hud).toHaveAttribute('data-story-phase', 'climb');
     await expect(page.getByTestId('story-toggle-cutaway')).toHaveAttribute('aria-pressed', 'true');
-    await expect(root).toHaveAttribute('data-scene-mode', 'hover', { timeout: 20000 });
+    await expect(root).toHaveAttribute('data-scene-mode', 'hover', { timeout: 90000 });
     await page.screenshot({ path: 'proof/story-climb-cutaway.png' });
 
     // Cruise
@@ -253,7 +257,7 @@ test.describe('AERIS X-9 — End-to-End & Visual Acceptance Suite (Gates G2–G8
     // Esc exits and lands back on the turntable
     await page.keyboard.press('Escape');
     await expect(hud).toHaveCount(0);
-    await expect(root).toHaveAttribute('data-scene-mode', 'showroom', { timeout: 20000 });
+    await expect(root).toHaveAttribute('data-scene-mode', 'showroom', { timeout: 90000 });
 
     expect(pageErrors).toEqual([]);
   });

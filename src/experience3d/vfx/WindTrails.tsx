@@ -16,6 +16,27 @@ function mulberry32(seed: number): () => number {
   };
 }
 
+/** Comet-shaped speed streak: bright head, long fading tail, soft cross-section. */
+const STREAK_VERTEX = /* glsl */ `
+  varying vec3 vLocal;
+  void main() {
+    vLocal = position;
+    gl_Position = projectionMatrix * modelViewMatrix * instanceMatrix * vec4(position, 1.0);
+  }
+`;
+const STREAK_FRAGMENT = /* glsl */ `
+  uniform float uOpacity;
+  uniform vec3 uColor;
+  varying vec3 vLocal;
+  void main() {
+    // z: -0.5 (head, toward nose) .. +0.5 (tail)
+    float head = smoothstep(-0.5, -0.38, vLocal.z);
+    float tail = 1.0 - smoothstep(-0.38, 0.5, vLocal.z);
+    float a = head * tail * tail * uOpacity;
+    gl_FragColor = vec4(uColor * a, a);
+  }
+`;
+
 interface StreakSeed {
   x: number;
   y: number;
@@ -32,7 +53,11 @@ export const WindTrails: React.FC = () => {
 
   const maxStreaks = QUALITY_SETTINGS[resolvedQuality].windStreakCount;
   const meshRef = useRef<THREE.InstancedMesh | null>(null);
-  const matRef = useRef<THREE.MeshBasicMaterial | null>(null);
+  const matRef = useRef<THREE.ShaderMaterial | null>(null);
+  const uniforms = useMemo(
+    () => ({ uOpacity: { value: 0 }, uColor: { value: new THREE.Color('#E8ECF0') } }),
+    []
+  );
   const timeAccumRef = useRef<number>(0);
   const dummy = useMemo(() => new THREE.Object3D(), []);
 
@@ -55,9 +80,9 @@ export const WindTrails: React.FC = () => {
         x,
         y,
         zOffset: (rng() - 0.5) * 18.0,
-        length: 0.9 + rng() * 2.2,
+        length: 1.4 + rng() * 3.2,
         speed: 14.0 + rng() * 12.0,
-        thickness: isWingtip ? 0.016 : 0.011,
+        thickness: isWingtip ? 0.012 : 0.008,
       });
     }
     return arr;
@@ -74,7 +99,7 @@ export const WindTrails: React.FC = () => {
     mesh.visible = visible;
     if (!visible) return;
 
-    mat.opacity = Math.min(0.26, frame.windIntensity * 0.28);
+    mat.uniforms.uOpacity.value = Math.min(0.55, frame.windIntensity * 0.6);
 
     if (!reducedMotion && !useAppStore.getState().flightPaused) {
       timeAccumRef.current = (timeAccumRef.current + dt * frame.windIntensity) % 1000;
@@ -110,12 +135,15 @@ export const WindTrails: React.FC = () => {
       visible={false}
     >
       <boxGeometry args={[1, 1, 1]} />
-      <meshBasicMaterial
+      <shaderMaterial
         ref={matRef}
-        color="#E8ECF0"
+        vertexShader={STREAK_VERTEX}
+        fragmentShader={STREAK_FRAGMENT}
+        uniforms={uniforms}
         transparent
-        opacity={0}
         depthWrite={false}
+        blending={THREE.AdditiveBlending}
+        toneMapped={false}
       />
     </instancedMesh>
   );

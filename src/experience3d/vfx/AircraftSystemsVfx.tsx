@@ -19,7 +19,6 @@ export const AircraftSystemsVfx: React.FC = () => {
   const strobeLeftMatRef = useRef<THREE.MeshBasicMaterial | null>(null);
   const strobeRightMatRef = useRef<THREE.MeshBasicMaterial | null>(null);
   const landingConeGroupRef = useRef<THREE.Group | null>(null);
-  const afterburnerGroupRef = useRef<THREE.Group | null>(null);
 
   const bladeAngles = useMemo(
     () => Array.from({ length: 14 }, (_, i) => (i / 14) * Math.PI * 2),
@@ -73,20 +72,6 @@ export const AircraftSystemsVfx: React.FC = () => {
       const explodeHide = explodeProgress < 0.1;
       landingConeGroupRef.current.visible =
         landingLightOn && gearLockedDown && explodeHide;
-    }
-
-    // 5. Twin Afterburner Plumes during Takeoff & Hover
-    if (afterburnerGroupRef.current) {
-      const abVisible = frame.windIntensity > 0.06 && explodeProgress < 0.05;
-      afterburnerGroupRef.current.visible = abVisible;
-      if (abVisible) {
-        const pulse = 0.92 + Math.sin(t * 28.0) * 0.08;
-        afterburnerGroupRef.current.scale.set(
-          1,
-          1,
-          (0.45 + frame.windIntensity * 0.95) * pulse
-        );
-      }
     }
   });
 
@@ -205,40 +190,6 @@ export const AircraftSystemsVfx: React.FC = () => {
         </mesh>
       </group>
 
-      {/* 5. Twin Afterburner Shock-Diamond Plumes */}
-      <group
-        ref={afterburnerGroupRef}
-        position={[0, 1.44, 4.48]}
-        visible={false}
-      >
-        {([-0.54, 0.54] as const).map((xPos, i) => (
-          <group key={`ab-plume-${i}`} position={[xPos, 0, 0]}>
-            {/* Outer Plasma Plume */}
-            <mesh position={[0, 0, 0.85]} rotation={[-Math.PI / 2, 0, 0]}>
-              <coneGeometry args={[0.21, 1.75, 24, 1, true]} />
-              <meshBasicMaterial
-                color="#4AD8FF"
-                transparent
-                opacity={0.34}
-                side={THREE.DoubleSide}
-                depthWrite={false}
-                blending={THREE.AdditiveBlending}
-              />
-            </mesh>
-            {/* Inner White-Amber Mach Shock Core */}
-            <mesh position={[0, 0, 0.52]} rotation={[-Math.PI / 2, 0, 0]}>
-              <coneGeometry args={[0.13, 1.05, 20]} />
-              <meshBasicMaterial
-                color="#FFB85C"
-                transparent
-                opacity={0.68}
-                depthWrite={false}
-                blending={THREE.AdditiveBlending}
-              />
-            </mesh>
-          </group>
-        ))}
-      </group>
     </group>
   );
 };

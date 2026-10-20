@@ -2,6 +2,7 @@ import { beforeEach, describe, expect, it } from 'vitest';
 import { getPartById } from '@/domain/partRegistry';
 import { resetVisualClock, useAppStore, visualClockRef } from '@/domain/store';
 import { STORY_PHASES, STORY_PHASE_COUNT } from '@/domain/story';
+import { getFlightPhaseLabel } from '@/domain/timeline';
 
 const store = () => useAppStore.getState();
 
@@ -53,21 +54,23 @@ describe('Guided 7-phase story (reference narrative)', () => {
     expect(store().mode).toBe('showroom');
   });
 
-  it('take-off plays the flight timeline from 0 and holds at 3.0s', () => {
+  it('take-off plays the flight timeline from 0 and holds at 2.95s (before the gear-door cutaway window)', () => {
     store().dispatch({ type: 'STORY_GOTO', index: 4 });
     expect(store().mode).toBe('flight-transition');
-    expect(store().flightHoldSeconds).toBe(3.0);
+    expect(store().flightHoldSeconds).toBe(2.95);
+    // Hold must stay in LIFTOFF: 3.0s starts GEAR DOOR OPEN, which auto-enables the cutaway.
+    expect(getFlightPhaseLabel(2.95)).toBe('LIFTOFF');
     expect(visualClockRef.flightTimeSeconds).toBe(0);
   });
 
   it('climb continues from the take-off hold and runs to hover hand-off', () => {
     store().dispatch({ type: 'STORY_GOTO', index: 4 });
-    visualClockRef.flightTimeSeconds = 3.0;
+    visualClockRef.flightTimeSeconds = 2.95;
     store().dispatch({ type: 'STORY_NEXT' });
     expect(store().storyPhaseIndex).toBe(5);
     expect(store().mode).toBe('flight-transition');
     expect(store().flightHoldSeconds).toBeNull();
-    expect(visualClockRef.flightTimeSeconds).toBe(3.0);
+    expect(visualClockRef.flightTimeSeconds).toBe(2.95);
     expect(store().isCutaway).toBe(true);
   });
 
@@ -83,8 +86,8 @@ describe('Guided 7-phase story (reference narrative)', () => {
   it('reduced motion skips segment playback to the segment end', () => {
     useAppStore.setState({ reducedMotion: true });
     store().dispatch({ type: 'STORY_GOTO', index: 4 });
-    expect(visualClockRef.flightTimeSeconds).toBe(3.0);
-    expect(store().flightElapsedUi).toBe(3.0);
+    expect(visualClockRef.flightTimeSeconds).toBe(2.95);
+    expect(store().flightElapsedUi).toBe(2.95);
   });
 
   it('next/prev are bounded to the 7 phases', () => {
