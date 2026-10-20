@@ -2,6 +2,7 @@ import React, { useMemo, useRef } from 'react';
 import { useFrame } from '@react-three/fiber';
 import * as THREE from 'three';
 import { useAppStore } from '@/domain/store';
+import { getStoryPhase } from '@/domain/story';
 import { useAircraftRig } from '../aircraft/AircraftRig';
 
 export const AircraftSystemsVfx: React.FC = () => {
@@ -19,6 +20,8 @@ export const AircraftSystemsVfx: React.FC = () => {
   const strobeLeftMatRef = useRef<THREE.MeshBasicMaterial | null>(null);
   const strobeRightMatRef = useRef<THREE.MeshBasicMaterial | null>(null);
   const landingConeGroupRef = useRef<THREE.Group | null>(null);
+  const fanBlurMatRefs = useRef<(THREE.MeshBasicMaterial | null)[]>([]);
+  const fanSpeedRef = useRef(4.5);
 
   const bladeAngles = useMemo(
     () => Array.from({ length: 14 }, (_, i) => (i / 14) * Math.PI * 2),
@@ -30,8 +33,20 @@ export const AircraftSystemsVfx: React.FC = () => {
     const t = clock.elapsedTime;
     const frame = currentFlightFrameRef.current;
 
-    // 1. Spin twin turbofan compressor rotors (Idle 21.4% N1 -> Flight 94.8% N1)
-    const fanSpeed = reducedMotion ? 0 : 4.5 + frame.windIntensity * 24.0;
+    // 1. Compressor fans visible inside both intakes. Story gate = engine off, engine start spools
+    //    up over ~4.5s to ground idle, flight scales with the timeline.
+    const story = useAppStore.getState();
+    const phase = getStoryPhase(story.storyPhaseIndex);
+    let targetSpeed = 4.5 + frame.windIntensity * 24.0;
+    if (phase?.id === 'gate') targetSpeed = 0;
+    else if (phase && phase.flight.kind === 'ground') targetSpeed = 9.0;
+    const spoolRate = targetSpeed > fanSpeedRef.current ? 0.55 : 0.35;
+    fanSpeedRef.current += (targetSpeed - fanSpeedRef.current) * Math.min(1, dt * spoolRate);
+    if (phase?.id === 'gate' && fanSpeedRef.current < 0.05) fanSpeedRef.current = 0;
+    const fanSpeed = reducedMotion ? 0 : fanSpeedRef.current;
+    for (const m of fanBlurMatRefs.current) {
+      if (m) m.opacity = Math.min(0.42, (reducedMotion ? targetSpeed : fanSpeedRef.current) / 22);
+    }
     if (fanLeftRef.current) {
       fanLeftRef.current.rotation.z += fanSpeed * dt;
     }
@@ -84,6 +99,20 @@ export const AircraftSystemsVfx: React.FC = () => {
           ref={side < 0 ? fanLeftRef : fanRightRef}
           position={[side * 0.95, 1.31, -2.6]}
         >
+          {/* Motion-blur disc that fades in as the rotor spools up */}
+          <mesh position={[0, 0, -0.012]}>
+            <circleGeometry args={[0.2, 40]} />
+            <meshBasicMaterial
+              ref={(m) => {
+                fanBlurMatRefs.current[side < 0 ? 0 : 1] = m;
+              }}
+              color="#C9D2DC"
+              transparent
+              opacity={0}
+              depthWrite={false}
+              side={THREE.DoubleSide}
+            />
+          </mesh>
           {/* Spinner Cone */}
           <mesh rotation={[Math.PI / 2, 0, 0]}>
             <coneGeometry args={[0.065, 0.18, 16]} />
@@ -102,9 +131,10 @@ export const AircraftSystemsVfx: React.FC = () => {
             >
               <boxGeometry args={[0.14, 0.028, 0.008]} />
               <meshStandardMaterial
-                color="#98B4CE"
-                metalness={0.9}
-                roughness={0.18}
+                color="#C3CBD3"
+                emissive="#3A4048"
+                metalness={0.85}
+                roughness={0.22}
               />
             </mesh>
           ))}

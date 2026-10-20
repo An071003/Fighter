@@ -1,6 +1,7 @@
 import React, { useEffect, useMemo, useRef } from 'react';
 import { useFrame } from '@react-three/fiber';
 import * as THREE from 'three';
+import { useAppStore } from '@/domain/store';
 import { useAircraftRig } from '../aircraft/AircraftRig';
 
 const TICK_COUNT = 72;
@@ -51,7 +52,7 @@ export const Turntable: React.FC = () => {
     if (!root) return;
 
     root.position.y = frame.platformY;
-    root.visible = frame.platformVisible;
+    root.visible = frame.platformVisible && useAppStore.getState().storyPhaseIndex === null;
 
     for (const mat of materialsRef.current) {
       const isTransparent = frame.platformOpacity < 0.995;

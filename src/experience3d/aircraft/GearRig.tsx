@@ -1,8 +1,10 @@
 import React, { useMemo } from 'react';
 import { useFrame } from '@react-three/fiber';
 import * as THREE from 'three';
+import { STORY_TAXI_SPEED } from '@/domain/config';
 import { getPartRestPose } from '@/domain/partRegistry';
 import { useAppStore } from '@/domain/store';
+import { getStoryPhase } from '@/domain/story';
 import { useAircraftRig } from './AircraftRig';
 
 const DEG2RAD = Math.PI / 180;
@@ -20,7 +22,9 @@ export const GearRig: React.FC = () => {
     []
   );
 
-  useFrame(() => {
+  const taxiAngleRef = useMemo(() => ({ value: 0 }), []);
+
+  useFrame((_, rawDelta) => {
     const state = useAppStore.getState();
     const isFlightActive =
       state.mode === 'flight-transition' ||
@@ -33,6 +37,23 @@ export const GearRig: React.FC = () => {
         const sObj = nodes.get(sId);
         if (sObj && sObj.scale.x !== 1) {
           sObj.scale.setScalar(1);
+        }
+      }
+      // Story taxi: roll the wheels at ground speed (runs after ExplodeController's rest pose)
+      if (getStoryPhase(state.storyPhaseIndex)?.id === 'taxi' && !state.reducedMotion && !state.flightPaused) {
+        taxiAngleRef.value += Math.min(rawDelta, 0.05) * STORY_TAXI_SPEED;
+        for (const [wId, radius] of [
+          ['gear-wheel-front', 0.21],
+          ['gear-wheel-left', 0.27],
+          ['gear-wheel-right', 0.27],
+        ] as const) {
+          const wheelObj = nodes.get(wId);
+          if (!wheelObj) continue;
+          const rest = getPartRestPose(wId);
+          scratch.restQuat.set(rest.quaternion[0], rest.quaternion[1], rest.quaternion[2], rest.quaternion[3]);
+          scratch.euler.set(-taxiAngleRef.value / radius, 0, 0, 'XYZ');
+          scratch.deltaQuat.setFromEuler(scratch.euler);
+          wheelObj.quaternion.copy(scratch.restQuat).multiply(scratch.deltaQuat);
         }
       }
       return;

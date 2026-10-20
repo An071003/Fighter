@@ -537,6 +537,12 @@ def build_display_plate(mats: dict) -> bpy.types.Object:
         add_tube(bm, (sx * 0.055, 0.30, -2.27), (sx * 0.055, 0.345, -2.30), 0.008, seg=8, mat_index=HAZARD)
     add_tube(bm, (-0.058, 0.345, -2.30), (0.058, 0.345, -2.30), 0.009, seg=8, mat_index=HAZARD)
 
+    # Seat pedestal / rails down to the well floor, tub side walls and floor plate
+    add_chamfer_prism(bm, (0.0, 0.165, -2.22), (0.0, 0.165, -1.80), 0.11, 0.055, 0.012, TUB)
+    for sx in (-1.0, 1.0):
+        add_chamfer_prism(bm, (sx * 0.27, 0.22, -2.95), (sx * 0.27, 0.22, -1.55), 0.012, 0.11, 0.004, TUB)
+    add_chamfer_prism(bm, (0.0, 0.112, -2.95), (0.0, 0.112, -1.55), 0.27, 0.006, 0.003, TUB)
+
     # --- Instrument panel tilted toward the pilot ---
     add_chamfer_prism(bm, (0.0, 0.24, -2.58), (0.0, 0.43, -2.66), 0.215, 0.022, 0.012, TUB)
     panel_dir = (Vector((0.0, 0.43, -2.66)) - Vector((0.0, 0.24, -2.58))).normalized()
@@ -747,15 +753,26 @@ def fuselage_lower_y_at_x(abs_x: float, z: float) -> float:
     return _lower_y(abs_x / hw, bot_y, chine_y)
 
 
+COCKPIT_WELL_HW = 0.31
+COCKPIT_WELL_DEPTH = 0.30
+
+
+def cockpit_well_depth(abs_x: float, z: float) -> float:
+    """Depth of the open cockpit tub below the deck at (|x|, z); 0 outside the well."""
+    dz = smoothstep(-4.32, -4.08, z) * (1.0 - smoothstep(-2.78, -2.52, z))
+    dx = 1.0 - smoothstep(COCKPIT_WELL_HW - 0.07, COCKPIT_WELL_HW, abs_x)
+    return COCKPIT_WELL_DEPTH * dz * dx
+
+
 def chine_ring(z: float, scale_inset: float = 1.0) -> list[tuple[float, float, float]]:
-    """48-point bilaterally symmetric faceted section (sharp chine at |x| = hw)."""
+    """48-point bilaterally symmetric faceted section (sharp chine at |x| = hw), with the cockpit well."""
     hw, top_y, bot_y, chine_y = fuselage_envelope(z)
     mid_y = (top_y + bot_y) * 0.5
     right: list[tuple[float, float, float]] = []
     n = 12
     for k in range(n + 1):  # top centre -> chine
         r = math.sin((k / n) * math.pi * 0.5)
-        right.append((hw * r, _upper_y(r, top_y, chine_y), z))
+        right.append((hw * r, _upper_y(r, top_y, chine_y) - cockpit_well_depth(hw * r, z), z))
     for k in range(1, n + 1):  # chine -> bottom centre
         r = math.cos((k / n) * math.pi * 0.5)
         right.append((hw * r, _lower_y(r, bot_y, chine_y), z))
@@ -1283,9 +1300,9 @@ def generate_aircraft() -> None:
 
     # 4. THREE ARTICULATED LANDING GEAR ASSEMBLIES (12 parts)
     gear_specs = [
-        ("FRONT", (0.0, -0.40, -4.30), (0.0, -0.96, -4.30), (-0.15, 0.05, -0.40, -4.85, -3.80), 0.21, 0.070),
-        ("LEFT", (-0.80, -0.51, 0.85), (-0.80, -0.90, 0.85), (-1.00, -0.58, -0.52, 0.20, 1.45), 0.27, 0.090),
-        ("RIGHT", (0.80, -0.51, 0.85), (0.80, -0.90, 0.85), (0.58, 1.00, -0.52, 0.20, 1.45), 0.27, 0.090),
+        ("FRONT", (0.0, -0.40, -4.30), (0.0, -1.19, -4.30), (-0.15, 0.05, -0.40, -4.85, -3.80), 0.21, 0.070),
+        ("LEFT", (-0.80, -0.51, 0.85), (-0.80, -1.13, 0.85), (-1.00, -0.58, -0.52, 0.20, 1.45), 0.27, 0.090),
+        ("RIGHT", (0.80, -0.51, 0.85), (0.80, -1.13, 0.85), (0.58, 1.00, -0.52, 0.20, 1.45), 0.27, 0.090),
     ]
 
     for g_side, strut_piv, wheel_piv, door_box, w_rad, w_hw in gear_specs:

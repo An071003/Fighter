@@ -27,6 +27,8 @@ export interface StoryMetric {
   value: number;
   unit: string;
   decimals: number;
+  /** Count-up duration when entering the phase (default 1.1s). */
+  rampSeconds?: number;
 }
 
 export interface StoryPhase {
@@ -55,7 +57,7 @@ export const STORY_PHASES: readonly StoryPhase[] = [
     id: 'gate',
     key: '1',
     label: 'Sân đỗ',
-    metric: { label: 'N1 · ĐỘNG CƠ TRÁI', value: 0, unit: '%', decimals: 1 },
+    metric: { label: 'N1 · ĐỘNG CƠ', value: 0, unit: '%', decimals: 1 },
     statusLine: 'Sân đỗ · CONF 0 · động cơ tắt · 0 kt · càng hạ',
     camera: { position: [-7.4, 3.6, -10.6], target: [0, 1.8, -3.6], fov: 30 },
     systems: { cutaway: false, beacon: false, strobe: false, landing: false },
@@ -74,9 +76,9 @@ export const STORY_PHASES: readonly StoryPhase[] = [
     id: 'start',
     key: '2',
     label: 'Khởi động',
-    metric: { label: 'N1 · ĐỘNG CƠ TRÁI', value: 21.4, unit: '%', decimals: 1 },
+    metric: { label: 'N1 · ĐỘNG CƠ', value: 21.4, unit: '%', decimals: 1, rampSeconds: 4.5 },
     statusLine: 'Khởi động · CONF 0 · N1 21% · 0 kt · càng hạ',
-    camera: { position: [-6.6, 1.9, -9.4], target: [-0.9, 1.32, -3.0], fov: 30 },
+    camera: { position: [-3.1, 1.5, -8.9], target: [-0.95, 1.31, -2.9], fov: 24 },
     systems: { cutaway: false, beacon: true, strobe: false, landing: false },
     flight: { kind: 'ground' },
     callout: {
@@ -85,7 +87,7 @@ export const STORY_PHASES: readonly StoryPhase[] = [
       title: 'Cửa hút gió DSI · quạt nén',
       body: 'Cửa hút gió không vách ngăn (DSI) nạp khí vào quạt nén 14 cánh đang lên vòng tua không tải. Đèn chống va chạm đỏ nháy 1 Hz.',
       status: 'N1 21.4% · EGT 498°C',
-      offsetPx: [170, -120],
+      offsetPx: [190, -150],
       side: 'right',
     },
   },
@@ -112,7 +114,7 @@ export const STORY_PHASES: readonly StoryPhase[] = [
     id: 'lineup',
     key: '4',
     label: 'Vào đường băng',
-    metric: { label: 'N1 · ĐỘNG CƠ TRÁI', value: 32.0, unit: '%', decimals: 1 },
+    metric: { label: 'N1 · ĐỘNG CƠ', value: 32.0, unit: '%', decimals: 1 },
     statusLine: 'Vào đường băng · CONF 1 · N1 32% · 0 kt · càng hạ',
     camera: { position: [0.2, 24, 1.6], target: [0, 1.2, -0.8], fov: 34 },
     systems: { cutaway: false, beacon: true, strobe: true, landing: true },

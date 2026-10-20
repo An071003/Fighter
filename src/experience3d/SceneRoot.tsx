@@ -10,6 +10,7 @@ import { QualityManager } from './quality/QualityManager';
 import { ResourceBoundary } from './quality/ResourceBoundary';
 import { CameraRig } from './scene/CameraRig';
 import { StudioLighting } from './scene/StudioLighting';
+import { AirfieldGround } from './scene/AirfieldGround';
 import { Turntable } from './scene/Turntable';
 import { StoryAnchorProjector } from './story/StoryAnchorProjector';
 import { Atmosphere } from './vfx/Atmosphere';
@@ -28,6 +29,7 @@ export const SceneRoot: React.FC = () => {
 
       {/* Independent Turntable Root (Jet is NOT parented under Turntable) */}
       <Turntable />
+      <AirfieldGround />
 
       {/* World-Origin Fixed Aircraft Anchor (X=0, Z=0 invariant) */}
       <ResourceBoundary>

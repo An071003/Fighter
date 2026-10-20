@@ -10,6 +10,9 @@ export const TURNTABLE_DEG_PER_SEC = 9.0;
 /** Whole-aircraft lift at 100% explode so downward-moving gear/belly parts stay above the deck. */
 export const EXPLODE_LIFT_Y = 1.55;
 
+/** Story taxi roll: ground markings scroll at this speed (units/s) and the wheels spin to match. */
+export const STORY_TAXI_SPEED = 2.6;
+
 export const CATEGORY_LABELS: Record<PartCategory, { vi: string; en: string; layer: number }> = {
   PANEL: { vi: 'Tấm bảo trì ngoại vi', en: 'Service Panels', layer: 1 },
   CANOPY: { vi: 'Vòm kính & Buồng lái', en: 'Canopy & Cockpit', layer: 2 },

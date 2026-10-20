@@ -37,14 +37,14 @@ const StoryMetricReadout: React.FC<{ metric: StoryMetric; reducedMotion: boolean
       return;
     }
     const controls = animate(from, metric.value, {
-      duration: 1.1,
+      duration: metric.rampSeconds ?? 1.1,
       ease: [0.22, 1, 0.36, 1],
       onUpdate: (v) => {
         el.textContent = formatMetric(v, metric.decimals);
       },
     });
     return () => controls.stop();
-  }, [metric.value, metric.decimals, reducedMotion]);
+  }, [metric.value, metric.decimals, metric.rampSeconds, reducedMotion]);
 
   return (
     <div data-testid="story-metric" className="select-none">
