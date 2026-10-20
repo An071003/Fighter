@@ -1,6 +1,7 @@
 import type { CameraPresetName, PartCategory, ResolvedQualityTier } from './types';
 
-export const AIRCRAFT_MODEL_URL = '/assets/aircraft/aeris-x9.glb';
+const rawBase = typeof import.meta !== 'undefined' && import.meta.env?.BASE_URL ? import.meta.env.BASE_URL : '/';
+export const AIRCRAFT_MODEL_URL = `${rawBase.replace(/\/$/, '')}/assets/aircraft/aeris-x9.glb`;
 
 export const FLIGHT_DURATION_SECONDS = 7.0;
 export const RETURN_DURATION_SECONDS = 4.2;

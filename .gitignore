@@ -6,3 +6,6 @@ dist-ssr/
 playwright-report/
 test-results/
 *.blend1
+UsersADMINAppDataRoamingnpm-cache/
+.DS_Store
+Thumbs.db
